@@ -1,0 +1,83 @@
+﻿import 'dart:async';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../domain/entities/message_entity.dart';
+import '../../../domain/usecases/get_messages_stream.dart';
+import '../../../domain/usecases/mark_as_read.dart';
+import '../../../domain/usecases/send_message.dart';
+import '../../../domain/usecases/set_typing_status.dart';
+import 'chat_room_event.dart';
+import 'chat_room_state.dart';
+
+class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
+  final GetMessagesStream getMessagesStream;
+  final SendMessage sendMessage;
+  final MarkAsRead markAsRead;
+  final SetTypingStatus setTypingStatus;
+  StreamSubscription<List<MessageEntity>>? _messagesSubscription;
+
+  ChatRoomBloc({
+    required this.getMessagesStream,
+    required this.sendMessage,
+    required this.markAsRead,
+    required this.setTypingStatus,
+  }) : super(ChatRoomInitial()) {
+    on<LoadMessagesEvent>(_onLoadMessages);
+    on<MessagesUpdatedEvent>(_onMessagesUpdated);
+    on<SendTextMessageEvent>(_onSendTextMessage);
+    on<MarkChatAsReadEvent>(_onMarkChatAsRead);
+    on<SetTypingEvent>(_onSetTyping);
+  }
+
+  void _onLoadMessages(LoadMessagesEvent event, Emitter<ChatRoomState> emit) {
+    emit(ChatRoomLoading());
+    _messagesSubscription?.cancel();
+
+    // Mark as read immediately when loading
+    markAsRead(chatId: event.chatId, currentUserId: event.currentUserId);
+
+    _messagesSubscription = getMessagesStream(event.chatId).listen(
+      (messages) => add(MessagesUpdatedEvent(messages)),
+      onError: (err) => emit(ChatRoomError(err.toString())),
+    );
+  }
+
+  void _onMessagesUpdated(MessagesUpdatedEvent event, Emitter<ChatRoomState> emit) {
+    emit(ChatRoomLoaded(event.messages));
+  }
+
+  Future<void> _onSendTextMessage(
+    SendTextMessageEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
+    await sendMessage(
+      chatId: event.chatId,
+      content: event.content,
+      type: 'text',
+      replyTo: event.replyTo,
+    );
+  }
+
+  Future<void> _onMarkChatAsRead(
+    MarkChatAsReadEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
+    await markAsRead(chatId: event.chatId, currentUserId: event.currentUserId);
+  }
+
+  Future<void> _onSetTyping(
+    SetTypingEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
+    await setTypingStatus(
+      chatId: event.chatId,
+      userId: event.userId,
+      isTyping: event.isTyping,
+    );
+  }
+
+  @override
+  Future<void> close() {
+    _messagesSubscription?.cancel();
+    return super.close();
+  }
+}

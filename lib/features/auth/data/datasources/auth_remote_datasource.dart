@@ -1,0 +1,230 @@
+﻿import 'dart:async';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import '../../../../core/constants/firebase_constants.dart';
+import '../../../../core/errors/exceptions.dart';
+import '../models/user_model.dart';
+
+abstract class AuthRemoteDataSource {
+  Stream<User?> get authStateChanges;
+  User? get currentFirebaseUser;
+  Future<UserModel?> getUserData(String uid);
+  Future<String> sendPhoneOtp(String phoneNumber);
+  Future<UserModel> verifyOtp({
+    required String verificationId,
+    required String smsCode,
+  });
+  Future<UserModel> saveUserProfile({
+    required String displayName,
+    required String bio,
+    File? imageFile,
+  });
+  Future<void> updateOnlineStatus(bool isOnline);
+  Future<void> signOut();
+}
+
+class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
+  final FirebaseAuth _firebaseAuth;
+  final FirebaseFirestore _firestore;
+  final FirebaseStorage _storage;
+
+  AuthRemoteDataSourceImpl({
+    FirebaseAuth? firebaseAuth,
+    FirebaseFirestore? firestore,
+    FirebaseStorage? storage,
+  })  : _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance,
+        _storage = storage ?? FirebaseStorage.instance;
+
+  @override
+  Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
+
+  @override
+  User? get currentFirebaseUser => _firebaseAuth.currentUser;
+
+  @override
+  Future<UserModel?> getUserData(String uid) async {
+    try {
+      final doc = await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .doc(uid)
+          .get();
+
+      if (!doc.exists) return null;
+      return UserModel.fromDocument(doc);
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<String> sendPhoneOtp(String phoneNumber) async {
+    final completer = Completer<String>();
+
+    try {
+      await _firebaseAuth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-resolution on Android
+          await _firebaseAuth.signInWithCredential(credential);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (!completer.isCompleted) {
+            completer.completeError(
+              AuthException(e.message ?? 'Verification failed', e.code),
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        timeout: const Duration(seconds: 60),
+      );
+
+      return await completer.future;
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException(e.toString());
+    }
+  }
+
+  @override
+  Future<UserModel> verifyOtp({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user == null) {
+        throw const AuthException('Failed to sign in: user is null');
+      }
+
+      // Check if user already exists in Firestore
+      final existingDoc = await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .doc(user.uid)
+          .get();
+
+      if (existingDoc.exists) {
+        return UserModel.fromDocument(existingDoc);
+      } else {
+        // Create basic user profile
+        final newUser = UserModel(
+          uid: user.uid,
+          displayName: '',
+          phoneNumber: user.phoneNumber ?? '',
+          isOnline: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        await _firestore
+            .collection(FirebaseConstants.usersCollection)
+            .doc(user.uid)
+            .set(newUser.toJson());
+
+        return newUser;
+      }
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(e.message ?? 'Invalid OTP code', e.code);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException(e.toString());
+    }
+  }
+
+  @override
+  Future<UserModel> saveUserProfile({
+    required String displayName,
+    required String bio,
+    File? imageFile,
+  }) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) {
+        throw const AuthException('Not authenticated');
+      }
+
+      String? photoUrl;
+
+      if (imageFile != null) {
+        final ref = _storage
+            .ref()
+            .child(FirebaseConstants.profilePhotosPath)
+            .child('${user.uid}.jpg');
+
+        final uploadTask = await ref.putFile(imageFile);
+        photoUrl = await uploadTask.ref.getDownloadURL();
+      }
+
+      final updateData = <String, dynamic>{
+        'displayName': displayName,
+        'bio': bio,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (photoUrl != null) {
+        updateData['photoUrl'] = photoUrl;
+      }
+
+      await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .doc(user.uid)
+          .update(updateData);
+
+      final updatedDoc = await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .doc(user.uid)
+          .get();
+
+      return UserModel.fromDocument(updatedDoc);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> updateOnlineStatus(bool isOnline) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) return;
+
+      await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .doc(user.uid)
+          .update({
+        'isOnline': isOnline,
+        'lastSeen': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Best effort update
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    try {
+      await updateOnlineStatus(false);
+      await _firebaseAuth.signOut();
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+}

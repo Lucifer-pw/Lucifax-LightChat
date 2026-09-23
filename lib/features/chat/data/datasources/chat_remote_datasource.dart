@@ -1,0 +1,264 @@
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/constants/firebase_constants.dart';
+import '../../../../core/errors/exceptions.dart';
+import '../models/chat_model.dart';
+import '../models/message_model.dart';
+
+abstract class ChatRemoteDataSource {
+  Stream<List<ChatModel>> getChatsStream({required String userId, required String type});
+  Stream<List<MessageModel>> getMessagesStream(String chatId);
+  Future<MessageModel> sendMessage({
+    required String chatId,
+    required String content,
+    String type = 'text',
+    Map<String, dynamic>? mediaInfo,
+    Map<String, dynamic>? replyTo,
+  });
+  Future<void> markAsRead({
+    required String chatId,
+    required String currentUserId,
+  });
+  Future<ChatModel> createOrGetPrivateChat({
+    required String currentUserId,
+    required String otherUserId,
+    required String otherUserName,
+    String? otherUserPhoto,
+  });
+  Future<void> setTypingStatus({
+    required String chatId,
+    required String userId,
+    required bool isTyping,
+  });
+}
+
+class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _firebaseAuth;
+
+  ChatRemoteDataSourceImpl({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? firebaseAuth,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _firebaseAuth = firebaseAuth ?? FirebaseAuth.instance;
+
+  @override
+  Stream<List<ChatModel>> getChatsStream({
+    required String userId,
+    required String type,
+  }) {
+    return _firestore
+        .collection(FirebaseConstants.chatsCollection)
+        .where('participants', arrayContains: userId)
+        .where('type', isEqualTo: type)
+        .orderBy('updatedAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => ChatModel.fromDocument(doc)).toList();
+    });
+  }
+
+  @override
+  Stream<List<MessageModel>> getMessagesStream(String chatId) {
+    return _firestore
+        .collection(FirebaseConstants.chatsCollection)
+        .doc(chatId)
+        .collection(FirebaseConstants.messagesSubcollection)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => MessageModel.fromDocument(doc)).toList();
+    });
+  }
+
+  @override
+  Future<MessageModel> sendMessage({
+    required String chatId,
+    required String content,
+    String type = 'text',
+    Map<String, dynamic>? mediaInfo,
+    Map<String, dynamic>? replyTo,
+  }) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) throw const AuthException('User not logged in');
+
+      // Fetch user displayName
+      final userDoc = await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .doc(user.uid)
+          .get();
+      final senderName = userDoc.data()?['displayName'] ?? 'User';
+
+      final messageRef = _firestore
+          .collection(FirebaseConstants.chatsCollection)
+          .doc(chatId)
+          .collection(FirebaseConstants.messagesSubcollection)
+          .doc();
+
+      final now = DateTime.now();
+
+      final messageModel = MessageModel(
+        messageId: messageRef.id,
+        chatId: chatId,
+        senderId: user.uid,
+        senderName: senderName,
+        type: type,
+        content: content,
+        mediaInfo: mediaInfo,
+        replyTo: replyTo,
+        status: 'sent',
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      final batch = _firestore.batch();
+
+      // 1. Write message
+      batch.set(messageRef, messageModel.toJson());
+
+      // 2. Update chat last message & unread count
+      final chatRef = _firestore.collection(FirebaseConstants.chatsCollection).doc(chatId);
+      final chatDoc = await chatRef.get();
+      final participants = (chatDoc.data()?['participants'] as List<dynamic>?) ?? [];
+
+      final unreadCountUpdate = <String, dynamic>{};
+      for (var p in participants) {
+        if (p != user.uid) {
+          unreadCountUpdate['unreadCount.$p'] = FieldValue.increment(1);
+        }
+      }
+
+      batch.update(chatRef, {
+        'lastMessage': {
+          'text': content,
+          'senderId': user.uid,
+          'senderName': senderName,
+          'type': type,
+          'timestamp': Timestamp.fromDate(now),
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+        ...unreadCountUpdate,
+      });
+
+      await batch.commit();
+      return messageModel;
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> markAsRead({
+    required String chatId,
+    required String currentUserId,
+  }) async {
+    try {
+      final chatRef = _firestore.collection(FirebaseConstants.chatsCollection).doc(chatId);
+
+      // Reset unread count for current user
+      await chatRef.update({
+        'unreadCount.$currentUserId': 0,
+      });
+
+      // Update message read status
+      final unreadMessages = await chatRef
+          .collection(FirebaseConstants.messagesSubcollection)
+          .where('senderId', isNotEqualTo: currentUserId)
+          .where('status', isNotEqualTo: 'read')
+          .get();
+
+      if (unreadMessages.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (var doc in unreadMessages.docs) {
+          batch.update(doc.reference, {
+            'status': 'read',
+            'readBy.$currentUserId': FieldValue.serverTimestamp(),
+          });
+        }
+        await batch.commit();
+      }
+    } catch (e) {
+      // Best-effort
+    }
+  }
+
+  @override
+  Future<ChatModel> createOrGetPrivateChat({
+    required String currentUserId,
+    required String otherUserId,
+    required String otherUserName,
+    String? otherUserPhoto,
+  }) async {
+    try {
+      // Check existing private chat
+      final query = await _firestore
+          .collection(FirebaseConstants.chatsCollection)
+          .where('type', isEqualTo: 'private')
+          .where('participants', arrayContains: currentUserId)
+          .get();
+
+      for (var doc in query.docs) {
+        final participants = (doc.data()['participants'] as List<dynamic>?) ?? [];
+        if (participants.contains(otherUserId)) {
+          return ChatModel.fromDocument(doc);
+        }
+      }
+
+      // Fetch current user details
+      final currentUserDoc = await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .doc(currentUserId)
+          .get();
+      final currentUserName = currentUserDoc.data()?['displayName'] ?? 'User';
+      final currentUserPhoto = currentUserDoc.data()?['photoUrl'];
+
+      final newChatRef = _firestore.collection(FirebaseConstants.chatsCollection).doc();
+
+      final newChat = ChatModel(
+        chatId: newChatRef.id,
+        type: 'private',
+        participants: [currentUserId, otherUserId],
+        participantDetails: {
+          currentUserId: {
+            'name': currentUserName,
+            'photoUrl': currentUserPhoto,
+          },
+          otherUserId: {
+            'name': otherUserName,
+            'photoUrl': otherUserPhoto,
+          },
+        },
+        unreadCount: {currentUserId: 0, otherUserId: 0},
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await newChatRef.set(newChat.toJson());
+      return newChat;
+    } catch (e) {
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<void> setTypingStatus({
+    required String chatId,
+    required String userId,
+    required bool isTyping,
+  }) async {
+    try {
+      final chatRef = _firestore.collection(FirebaseConstants.chatsCollection).doc(chatId);
+      if (isTyping) {
+        await chatRef.update({
+          'typingUsers': FieldValue.arrayUnion([userId]),
+        });
+      } else {
+        await chatRef.update({
+          'typingUsers': FieldValue.arrayRemove([userId]),
+        });
+      }
+    } catch (_) {}
+  }
+}

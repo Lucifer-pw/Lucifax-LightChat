@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "926525610962",
+    "project_id": "lucifax-lightchat",
+    "storage_bucket": "lucifax-lightchat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:926525610962:android:24441e5ebad07f57b6860b",
+        "android_client_info": {
+          "package_name": "com.Lucifax.LightChat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGUTmhtOaJnmdr74D0K1GPMs4x_L121so"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,80 @@
+name: lucifax_lightchat
+description: "Lucifax LightChat - WhatsApp-like Hybrid Messaging Application"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # Firebase Core & Services
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.8
+  cloud_firestore: ^4.15.8
+  firebase_storage: ^11.6.9
+  firebase_messaging: ^14.7.19
+  firebase_remote_config: ^4.3.8
+
+  # State Management & Architecture
+  flutter_bloc: ^8.1.4
+  equatable: ^2.0.5
+  dartz: ^0.10.1
+
+  # Routing & Navigation
+  go_router: ^13.2.0
+
+  # Dependency Injection
+  get_it: ^7.6.7
+  injectable: ^2.4.0
+
+  # Local Caching / Database
+  hive_flutter: ^1.1.0
+
+  # UI Components & Styling
+  google_fonts: ^6.1.0
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  flutter_svg: ^2.0.10+1
+  intl: ^0.19.0
+
+  # Media & Hardware
+  image_picker: ^1.0.7
+  file_picker: ^8.0.0
+  flutter_contacts: ^1.1.8
+  permission_handler: ^11.3.0
+
+  # QR Code Auth
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.1.0
+
+  # Networking & In-App Update
+  dio: ^5.4.1
+  package_info_plus: ^8.0.0
+  open_filex: ^4.4.0
+
+  # Utilities
+  uuid: ^4.3.3
+  timeago: ^3.6.1
+  url_launcher: ^6.2.5
+  connectivity_plus: ^6.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  injectable_generator: ^2.6.0
+  build_runner: ^2.4.8
+  hive_generator: ^2.0.1
+  mocktail: ^1.0.3
+  bloc_test: ^9.1.6
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+
