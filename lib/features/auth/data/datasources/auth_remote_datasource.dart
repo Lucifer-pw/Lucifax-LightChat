@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -115,17 +115,37 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw const AuthException('Failed to sign in: user is null');
       }
 
-      // Check if user already exists in Firestore
-      final existingDoc = await _firestore
-          .collection(FirebaseConstants.usersCollection)
-          .doc(user.uid)
-          .get();
+      // Try fetching or creating Firestore user with fallback
+      try {
+        final existingDoc = await _firestore
+            .collection(FirebaseConstants.usersCollection)
+            .doc(user.uid)
+            .get()
+            .timeout(const Duration(seconds: 4));
 
-      if (existingDoc.exists) {
-        return UserModel.fromDocument(existingDoc);
-      } else {
-        // Create basic user profile
-        final newUser = UserModel(
+        if (existingDoc.exists) {
+          return UserModel.fromDocument(existingDoc);
+        } else {
+          final newUser = UserModel(
+            uid: user.uid,
+            displayName: '',
+            phoneNumber: user.phoneNumber ?? '',
+            isOnline: true,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+
+          await _firestore
+              .collection(FirebaseConstants.usersCollection)
+              .doc(user.uid)
+              .set(newUser.toJson())
+              .timeout(const Duration(seconds: 4));
+
+          return newUser;
+        }
+      } catch (firestoreError) {
+        // Return in-memory user to allow user to proceed to ProfileSetupPage
+        return UserModel(
           uid: user.uid,
           displayName: '',
           phoneNumber: user.phoneNumber ?? '',
@@ -133,13 +153,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
         );
-
-        await _firestore
-            .collection(FirebaseConstants.usersCollection)
-            .doc(user.uid)
-            .set(newUser.toJson());
-
-        return newUser;
       }
     } on FirebaseAuthException catch (e) {
       throw AuthException(e.message ?? 'Invalid OTP code', e.code);
@@ -174,8 +187,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       final updateData = <String, dynamic>{
+        'uid': user.uid,
         'displayName': displayName,
+        'phoneNumber': user.phoneNumber ?? '',
         'bio': bio,
+        'isOnline': true,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -186,7 +202,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await _firestore
           .collection(FirebaseConstants.usersCollection)
           .doc(user.uid)
-          .update(updateData);
+          .set(updateData, SetOptions(merge: true));
 
       final updatedDoc = await _firestore
           .collection(FirebaseConstants.usersCollection)
