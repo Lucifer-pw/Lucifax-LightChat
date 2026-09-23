@@ -37,7 +37,9 @@ class LightChatApp extends StatelessWidget {
         listeners: [
           BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
+              debugPrint('[App] AuthBloc state changed: ${state.runtimeType}');
               if (state is AuthenticatedState) {
+                debugPrint('[App] Authenticated uid=${state.user.uid}, starting IncomingCallCubit');
                 getIt<IncomingCallCubit>().listenToIncomingCalls(state.user.uid);
               } else if (state is UnauthenticatedState) {
                 getIt<IncomingCallCubit>().stopListening();
@@ -46,13 +48,17 @@ class LightChatApp extends StatelessWidget {
           ),
           BlocListener<IncomingCallCubit, IncomingCallState>(
             listener: (context, state) {
+              debugPrint('[App] IncomingCallCubit state: ${state.runtimeType}');
               if (state is IncomingCallRinging) {
+                debugPrint('[App] RINGING! callId=${state.call.callId}, navigating...');
                 final authState = context.read<AuthBloc>().state;
                 final currentUserId = authState is AuthenticatedState ? authState.user.uid : '';
                 appRouter.push('/incoming-call', extra: {
                   'call': state.call,
                   'currentUserId': currentUserId,
                 });
+              } else if (state is IncomingCallError) {
+                debugPrint('[App] IncomingCallCubit ERROR: ${state.message}');
               }
             },
           ),
@@ -60,7 +66,7 @@ class LightChatApp extends StatelessWidget {
         child: MaterialApp.router(
           title: 'Lucifax LightChat',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.darkTheme, // Dark theme as default
+          theme: AppTheme.darkTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.dark,
           routerConfig: appRouter,

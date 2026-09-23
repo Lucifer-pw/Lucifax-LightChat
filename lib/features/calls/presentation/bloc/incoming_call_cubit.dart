@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/call_entity.dart';
 import '../../domain/usecases/end_call.dart';
@@ -14,13 +15,26 @@ abstract class IncomingCallState extends Equatable {
 
 class IncomingCallIdle extends IncomingCallState {}
 
+class IncomingCallListening extends IncomingCallState {}
+
 class IncomingCallRinging extends IncomingCallState {
   final CallEntity call;
+  final int _timestamp;
 
-  const IncomingCallRinging(this.call);
+  IncomingCallRinging(this.call)
+      : _timestamp = DateTime.now().millisecondsSinceEpoch;
 
   @override
-  List<Object?> get props => [call];
+  List<Object?> get props => [call.callId, _timestamp];
+}
+
+class IncomingCallError extends IncomingCallState {
+  final String message;
+
+  const IncomingCallError(this.message);
+
+  @override
+  List<Object?> get props => [message];
 }
 
 class IncomingCallCubit extends Cubit<IncomingCallState> {
@@ -36,34 +50,53 @@ class IncomingCallCubit extends Cubit<IncomingCallState> {
   }) : super(IncomingCallIdle());
 
   void listenToIncomingCalls(String userId) {
-    if (_currentUserId == userId && _incomingCallsSub != null) return;
+    if (_currentUserId == userId && _incomingCallsSub != null) {
+      debugPrint('[IncomingCallCubit] Already listening for userId=$userId');
+      return;
+    }
     _currentUserId = userId;
+    debugPrint('[IncomingCallCubit] START listening, userId=$userId');
 
     _incomingCallsSub?.cancel();
-    _incomingCallsSub = getIncomingCallsStream.call(userId).listen(
-      (calls) {
-        if (calls.isNotEmpty) {
-          // Find the most recent active incoming call
-          final activeCall = calls.firstWhere(
-            (c) => c.status == 'calling',
-            orElse: () => calls.first,
-          );
-          if (activeCall.status == 'calling') {
+
+    try {
+      _incomingCallsSub = getIncomingCallsStream.call(userId).listen(
+        (calls) {
+          debugPrint('[IncomingCallCubit] Stream data: ${calls.length} calls');
+
+          final activeCalls = calls
+              .where((c) => c.status == 'calling' && c.receiverId == userId)
+              .toList();
+
+          debugPrint('[IncomingCallCubit] Active incoming calls: ${activeCalls.length}');
+
+          if (activeCalls.isNotEmpty) {
+            final activeCall = activeCalls.first;
+            debugPrint('[IncomingCallCubit] RINGING callId=${activeCall.callId}, caller=${activeCall.callerName}');
             emit(IncomingCallRinging(activeCall));
           } else {
-            emit(IncomingCallIdle());
+            // Only emit Listening (not Idle) to indicate the stream is active
+            if (state is! IncomingCallListening) {
+              emit(IncomingCallListening());
+            }
           }
-        } else {
-          emit(IncomingCallIdle());
-        }
-      },
-      onError: (_) {
-        emit(IncomingCallIdle());
-      },
-    );
+        },
+        onError: (error) {
+          debugPrint('[IncomingCallCubit] Stream ERROR: $error');
+          emit(IncomingCallError('Stream error: $error'));
+        },
+      );
+
+      // Emit Listening to confirm subscription was created successfully
+      emit(IncomingCallListening());
+    } catch (e) {
+      debugPrint('[IncomingCallCubit] CATCH error: $e');
+      emit(IncomingCallError('Setup error: $e'));
+    }
   }
 
   void stopListening() {
+    debugPrint('[IncomingCallCubit] stopListening');
     _incomingCallsSub?.cancel();
     _incomingCallsSub = null;
     _currentUserId = null;
@@ -71,12 +104,12 @@ class IncomingCallCubit extends Cubit<IncomingCallState> {
   }
 
   Future<void> rejectIncomingCall(String callId) async {
-    emit(IncomingCallIdle());
+    emit(IncomingCallListening());
     await endCallUseCase.call(callId, status: 'rejected');
   }
 
   void clearIncomingCall() {
-    emit(IncomingCallIdle());
+    emit(IncomingCallListening());
   }
 
   @override
