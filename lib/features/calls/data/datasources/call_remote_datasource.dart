@@ -125,13 +125,14 @@ class CallRemoteDataSourceImpl implements CallRemoteDataSource {
 
   @override
   Stream<List<CallModel>> getIncomingCallsStream(String currentUserId) {
+    // Single where query to avoid composite index requirement
     return _callsCollection
-        .where('receiverId', isEqualTo: currentUserId)
-        .where('status', isEqualTo: 'calling')
+        .where('participants', arrayContains: currentUserId)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
           .map((doc) => CallModel.fromFirestore(doc))
+          .where((call) => call.receiverId == currentUserId && call.status == 'calling')
           .toList();
     });
   }

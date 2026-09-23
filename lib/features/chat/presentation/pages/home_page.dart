@@ -10,6 +10,7 @@ import '../../../app_update/presentation/widgets/update_dialog.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../music/presentation/widgets/global_mini_player.dart';
+import '../../../calls/presentation/bloc/incoming_call_cubit.dart';
 import '../../../status/presentation/bloc/status_bloc.dart';
 import '../../../status/presentation/bloc/status_event.dart';
 import '../../../status/presentation/pages/status_tab_page.dart';
@@ -43,6 +44,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       _privateChatBloc.add(LoadChatsEvent(userId: authState.user.uid, type: 'private'));
       _groupChatBloc.add(LoadChatsEvent(userId: authState.user.uid, type: 'group'));
       context.read<StatusBloc>().add(LoadStatusesEvent(userId: authState.user.uid));
+      // Ensure incoming call listener is active (BlocListener in app.dart may
+      // have missed the initial AuthenticatedState emitted during splash)
+      getIt<IncomingCallCubit>().listenToIncomingCalls(authState.user.uid);
     }
 
     // Auto-check for updates
