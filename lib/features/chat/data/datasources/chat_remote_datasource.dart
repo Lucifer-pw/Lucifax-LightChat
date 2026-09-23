@@ -71,14 +71,25 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     required String userId,
     required String type,
   }) {
+    // Single-field query (never requires composite index)
     return _firestore
         .collection(FirebaseConstants.chatsCollection)
         .where('participants', arrayContains: userId)
-        .where('type', isEqualTo: type)
-        .orderBy('updatedAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ChatModel.fromDocument(doc)).toList();
+      final chats = snapshot.docs.map((doc) => ChatModel.fromDocument(doc)).toList();
+
+      // In-memory filter by type ('private' or 'group')
+      final filtered = chats.where((c) => c.type == type).toList();
+
+      // In-memory sort by latest activity (updatedAt descending)
+      filtered.sort((a, b) {
+        final timeA = a.updatedAt ?? a.createdAt ?? DateTime(0);
+        final timeB = b.updatedAt ?? b.createdAt ?? DateTime(0);
+        return timeB.compareTo(timeA);
+      });
+
+      return filtered;
     });
   }
 
@@ -189,13 +200,17 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
       // Update message read status
       final unreadMessages = await chatRef
           .collection(FirebaseConstants.messagesSubcollection)
-          .where('senderId', isNotEqualTo: currentUserId)
           .where('status', isNotEqualTo: 'read')
           .get();
 
-      if (unreadMessages.docs.isNotEmpty) {
+      final toUpdate = unreadMessages.docs.where((doc) {
+        final data = doc.data();
+        return data['senderId'] != currentUserId;
+      }).toList();
+
+      if (toUpdate.isNotEmpty) {
         final batch = _firestore.batch();
-        for (var doc in unreadMessages.docs) {
+        for (var doc in toUpdate) {
           batch.update(doc.reference, {
             'status': 'read',
             'readBy.$currentUserId': FieldValue.serverTimestamp(),
@@ -216,16 +231,17 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     String? otherUserPhoto,
   }) async {
     try {
-      // Check existing private chat
+      // Check existing private chat using simple arrayContains query
       final query = await _firestore
           .collection(FirebaseConstants.chatsCollection)
-          .where('type', isEqualTo: 'private')
           .where('participants', arrayContains: currentUserId)
           .get();
 
       for (var doc in query.docs) {
-        final participants = (doc.data()['participants'] as List<dynamic>?) ?? [];
-        if (participants.contains(otherUserId)) {
+        final data = doc.data();
+        final isPrivate = (data['type'] ?? 'private') == 'private';
+        final participants = (data['participants'] as List<dynamic>?) ?? [];
+        if (isPrivate && participants.contains(otherUserId)) {
           return ChatModel.fromDocument(doc);
         }
       }

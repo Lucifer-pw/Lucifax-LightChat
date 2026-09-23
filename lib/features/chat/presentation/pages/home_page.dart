@@ -5,6 +5,8 @@ import '../../../../app/di/injection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import '../../../app_update/domain/usecases/check_for_update.dart';
+import '../../../app_update/presentation/widgets/update_dialog.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/chat_list/chat_list_bloc.dart';
@@ -37,6 +39,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       _privateChatBloc.add(LoadChatsEvent(userId: authState.user.uid, type: 'private'));
       _groupChatBloc.add(LoadChatsEvent(userId: authState.user.uid, type: 'group'));
     }
+
+    // Auto-check for updates
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAppUpdate(auto: true);
+    });
   }
 
   @override
@@ -45,6 +52,39 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _privateChatBloc.close();
     _groupChatBloc.close();
     super.dispose();
+  }
+
+  Future<void> _checkAppUpdate({bool auto = false}) async {
+    try {
+      final checkUpdate = getIt<CheckForUpdate>();
+      final result = await checkUpdate();
+
+      if (!mounted) return;
+
+      result.fold(
+        (failure) {
+          if (!auto) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(failure.message), backgroundColor: AppColors.error),
+            );
+          }
+        },
+        (updateInfo) {
+          if (updateInfo.hasUpdate) {
+            UpdateDialog.show(context, updateInfo);
+          } else if (!auto) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('You are on the latest version (v${updateInfo.currentVersion}) 👍'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
+        },
+      );
+    } catch (_) {
+      // Best-effort
+    }
   }
 
   @override
@@ -79,6 +119,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 context.push('/appearance-settings');
               } else if (value == 'qr_web') {
                 context.push('/qr-scanner');
+              } else if (value == 'check_update') {
+                _checkAppUpdate(auto: false);
               }
             },
             itemBuilder: (context) => [
@@ -97,6 +139,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               const PopupMenuItem(
                 value: 'settings',
                 child: Text('Appearance & Settings'),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'check_update',
+                child: Row(
+                  children: [
+                    Icon(Icons.system_update_rounded, size: 18, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text('Check for Updates'),
+                  ],
+                ),
               ),
             ],
           ),
@@ -163,9 +216,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       return const LoadingIndicator(message: 'Loading conversations...');
     } else if (state is ChatListError) {
       return Center(
-        child: Text(
-          state.message,
-          style: const TextStyle(color: AppColors.error),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            state.message,
+            style: const TextStyle(color: AppColors.error),
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     } else if (state is ChatListLoaded) {
