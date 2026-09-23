@@ -1,4 +1,4 @@
-﻿class FirebaseConstants {
+class FirebaseConstants {
   // Collection Names
   static const String usersCollection = 'users';
   static const String chatsCollection = 'chats';
@@ -11,6 +11,7 @@
   static const String webSessionsCollection = 'webSessions';
   static const String userWebSessionsCollection = 'userWebSessions';
   static const String appVersionsCollection = 'appVersions';
+  static const String callsCollection = 'calls';
 
   // Storage Paths
   static const String profilePhotosPath = 'profile_photos';

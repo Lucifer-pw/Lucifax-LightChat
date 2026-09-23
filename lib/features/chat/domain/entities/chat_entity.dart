@@ -1,4 +1,4 @@
-﻿import 'package:equatable/equatable.dart';
+import 'package:equatable/equatable.dart';
 
 class ChatEntity extends Equatable {
   final String chatId;
@@ -47,6 +47,14 @@ class ChatEntity extends Equatable {
       orElse: () => '',
     );
     return participantDetails[otherUserId]?['photoUrl'];
+  }
+
+  String getOtherUserId(String currentUserId) {
+    if (isGroup) return '';
+    return participants.firstWhere(
+      (id) => id != currentUserId,
+      orElse: () => '',
+    );
   }
 
   bool isOtherUserOnline(String currentUserId) {

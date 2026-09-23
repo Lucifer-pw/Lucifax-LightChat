@@ -8,8 +8,10 @@ import '../../../../core/theme/appearance_cubit.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/loading_indicator.dart';
+import 'package:uuid/uuid.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../calls/domain/entities/call_entity.dart';
 import '../../domain/entities/chat_entity.dart';
 import '../../domain/entities/message_entity.dart';
 import '../bloc/chat_room/chat_room_bloc.dart';
@@ -105,6 +107,46 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     );
   }
 
+  void _initiateCall(String type) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthenticatedState) return;
+
+    if (widget.chat == null || widget.chat!.isGroup) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group calling is not supported yet (1-on-1 calls only).')),
+      );
+      return;
+    }
+
+    final currentUserId = authState.user.uid;
+    final otherUserId = widget.chat!.getOtherUserId(currentUserId);
+    if (otherUserId.isEmpty) return;
+
+    final otherUserName = widget.chat!.getDisplayName(currentUserId);
+    final otherUserPhoto = widget.chat!.getDisplayPhoto(currentUserId);
+
+    final newCall = CallEntity(
+      callId: const Uuid().v4(),
+      callerId: currentUserId,
+      callerName: authState.user.displayName.isNotEmpty
+          ? authState.user.displayName
+          : 'LightChat User',
+      callerPhoto: authState.user.photoUrl,
+      receiverId: otherUserId,
+      receiverName: otherUserName,
+      receiverPhoto: otherUserPhoto,
+      type: type,
+      status: 'calling',
+      createdAt: DateTime.now(),
+    );
+
+    context.push('/call', extra: {
+      'call': newCall,
+      'isCaller': true,
+      'currentUserId': currentUserId,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
@@ -158,19 +200,11 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.videocam_rounded),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Video calling coming in Phase 4')),
-              );
-            },
+            onPressed: () => _initiateCall('video'),
           ),
           IconButton(
             icon: const Icon(Icons.call_rounded),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Voice calling coming in Phase 4')),
-              );
-            },
+            onPressed: () => _initiateCall('voice'),
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),

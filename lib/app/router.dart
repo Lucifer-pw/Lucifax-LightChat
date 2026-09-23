@@ -22,6 +22,9 @@ import '../features/status/domain/entities/user_status_group.dart';
 import '../features/status/presentation/pages/create_media_status_page.dart';
 import '../features/status/presentation/pages/create_text_status_page.dart';
 import '../features/status/presentation/pages/status_viewer_page.dart';
+import '../features/calls/domain/entities/call_entity.dart';
+import '../features/calls/presentation/pages/call_page.dart';
+import '../features/calls/presentation/pages/incoming_call_page.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -116,6 +119,32 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/music-player',
       builder: (context, state) => const FullMusicPlayerPage(),
+    ),
+    GoRoute(
+      path: '/call',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        final call = extra['call'] as CallEntity;
+        final isCaller = extra['isCaller'] as bool? ?? false;
+        final currentUserId = extra['currentUserId'] as String? ?? '';
+        return CallPage(
+          call: call,
+          isCaller: isCaller,
+          currentUserId: currentUserId,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/incoming-call',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        final call = extra['call'] as CallEntity;
+        final currentUserId = extra['currentUserId'] as String? ?? '';
+        return IncomingCallPage(
+          call: call,
+          currentUserId: currentUserId,
+        );
+      },
     ),
   ],
 );

@@ -56,6 +56,18 @@ import '../../features/music/domain/usecases/delete_music_track.dart';
 import '../../features/music/domain/usecases/get_music_tracks.dart';
 import '../../features/music/domain/usecases/upload_music_track.dart';
 import '../../features/music/presentation/bloc/music_player_cubit.dart';
+import '../../features/calls/data/datasources/call_remote_datasource.dart';
+import '../../features/calls/data/repositories/call_repository_impl.dart';
+import '../../features/calls/data/services/webrtc_service.dart';
+import '../../features/calls/domain/repositories/call_repository.dart';
+import '../../features/calls/domain/usecases/answer_call.dart';
+import '../../features/calls/domain/usecases/end_call.dart';
+import '../../features/calls/domain/usecases/get_call_history.dart';
+import '../../features/calls/domain/usecases/get_call_stream.dart';
+import '../../features/calls/domain/usecases/get_incoming_calls_stream.dart';
+import '../../features/calls/domain/usecases/make_call.dart';
+import '../../features/calls/presentation/bloc/call_cubit.dart';
+import '../../features/calls/presentation/bloc/incoming_call_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -210,5 +222,40 @@ Future<void> initDependencies() async {
   // ----------------------------------------------------
   getIt.registerLazySingleton<AppearanceCubit>(
     () => AppearanceCubit(),
+  );
+
+  // ----------------------------------------------------
+  // Calls Feature (Phase 4 - WebRTC)
+  // ----------------------------------------------------
+  getIt.registerFactory<WebRTCService>(() => WebRTCService());
+  getIt.registerLazySingleton<CallRemoteDataSource>(
+    () => CallRemoteDataSourceImpl(firestore: getIt()),
+  );
+  getIt.registerLazySingleton<CallRepository>(
+    () => CallRepositoryImpl(remoteDataSource: getIt()),
+  );
+  getIt.registerLazySingleton(() => MakeCall(getIt()));
+  getIt.registerLazySingleton(() => AnswerCall(getIt()));
+  getIt.registerLazySingleton(() => EndCall(getIt()));
+  getIt.registerLazySingleton(() => GetCallStream(getIt()));
+  getIt.registerLazySingleton(() => GetIncomingCallsStream(getIt()));
+  getIt.registerLazySingleton(() => GetCallHistory(getIt()));
+
+  getIt.registerFactory(
+    () => CallCubit(
+      webrtcService: getIt(),
+      makeCallUseCase: getIt(),
+      answerCallUseCase: getIt(),
+      endCallUseCase: getIt(),
+      getCallStreamUseCase: getIt(),
+      callRepository: getIt(),
+    ),
+  );
+
+  getIt.registerLazySingleton<IncomingCallCubit>(
+    () => IncomingCallCubit(
+      getIncomingCallsStream: getIt(),
+      endCallUseCase: getIt(),
+    ),
   );
 }

@@ -1,7 +1,7 @@
 name: lucifax_lightchat
 description: "Lucifax LightChat - WhatsApp-like Hybrid Messaging Application"
 publish_to: 'none'
-version: 1.0.6+6
+version: 1.0.7+7
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -47,6 +47,7 @@ dependencies:
   flutter_contacts: ^1.1.8
   permission_handler: ^11.3.0
   audioplayers: ^6.0.0
+  flutter_webrtc: 0.11.6+hotfix.1
 
   # QR Code Auth
   qr_flutter: ^4.1.0

@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/theme/appearance_cubit.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
+import '../features/auth/presentation/bloc/auth_state.dart';
+import '../features/calls/presentation/bloc/incoming_call_cubit.dart';
 import '../features/music/presentation/bloc/music_player_cubit.dart';
 import '../features/status/presentation/bloc/status_bloc.dart';
 import 'di/injection.dart';
@@ -27,14 +29,42 @@ class LightChatApp extends StatelessWidget {
         BlocProvider<AppearanceCubit>(
           create: (context) => getIt<AppearanceCubit>(),
         ),
+        BlocProvider<IncomingCallCubit>(
+          create: (context) => getIt<IncomingCallCubit>(),
+        ),
       ],
-      child: MaterialApp.router(
-        title: 'Lucifax LightChat',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme, // Dark theme as default
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.dark,
-        routerConfig: appRouter,
+      child: MultiBlocListener(
+        listeners: [
+          BlocListener<AuthBloc, AuthState>(
+            listener: (context, state) {
+              if (state is AuthenticatedState) {
+                getIt<IncomingCallCubit>().listenToIncomingCalls(state.user.uid);
+              } else if (state is UnauthenticatedState) {
+                getIt<IncomingCallCubit>().stopListening();
+              }
+            },
+          ),
+          BlocListener<IncomingCallCubit, IncomingCallState>(
+            listener: (context, state) {
+              if (state is IncomingCallRinging) {
+                final authState = context.read<AuthBloc>().state;
+                final currentUserId = authState is AuthenticatedState ? authState.user.uid : '';
+                appRouter.push('/incoming-call', extra: {
+                  'call': state.call,
+                  'currentUserId': currentUserId,
+                });
+              }
+            },
+          ),
+        ],
+        child: MaterialApp.router(
+          title: 'Lucifax LightChat',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme, // Dark theme as default
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.dark,
+          routerConfig: appRouter,
+        ),
       ),
     );
   }

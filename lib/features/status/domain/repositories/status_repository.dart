@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:dartz/dartz.dart';
 import '../../../../core/errors/failures.dart';
-import '../entities/status_item.dart';
 import '../entities/user_status_group.dart';
 
 abstract class StatusRepository {

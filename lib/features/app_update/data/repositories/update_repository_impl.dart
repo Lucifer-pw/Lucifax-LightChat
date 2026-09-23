@@ -83,7 +83,7 @@ class UpdateRepositoryImpl implements UpdateRepository {
         return const Right('Installer launched');
       } else {
         return Left(ServerFailure(
-            'Gagal membuka installer: ${result.message ?? "Izin instalasi tidak diberikan"}'));
+            'Gagal membuka installer: ${result.message.isNotEmpty ? result.message : "Izin instalasi tidak diberikan"}'));
       }
     } catch (e) {
       return Left(ServerFailure('Gagal mengunduh pembaruan: $e'));
