@@ -131,7 +131,7 @@ class _DownloadProgressDialogState extends State<DownloadProgressDialog> {
                   style: AppTextStyles.bodySmall
                       .copyWith(color: AppColors.error),
                 ),
-                AppSizes.vSpace20,
+                AppSizes.vSpace16,
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
