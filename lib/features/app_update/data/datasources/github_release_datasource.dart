@@ -59,10 +59,12 @@ class GithubReleaseDataSourceImpl implements GithubReleaseDataSource {
 
         final hasUpdate = _isNewerVersion(currentVersion, tagName);
 
+        final cleanNotes = _sanitizeReleaseNotes(body, tagName);
+
         return AppUpdateInfo(
           latestVersion: tagName,
           currentVersion: currentVersion,
-          releaseNotes: body,
+          releaseNotes: cleanNotes,
           downloadUrl: apkUrl,
           apkSize: apkSize,
           hasUpdate: hasUpdate,
@@ -131,5 +133,21 @@ class GithubReleaseDataSourceImpl implements GithubReleaseDataSource {
       if (l < c) return false;
     }
     return false;
+  }
+
+  String _sanitizeReleaseNotes(String rawNotes, String version) {
+    // Remove Full Changelog lines, raw commit hashes, and github links
+    var cleaned = rawNotes
+        .replaceAll(RegExp(r'\*\*Full Changelog\*\*:[^\n]*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'https?:\/\/[^\s\)]+', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\[.*?\]\(.*?\)', caseSensitive: false), '')
+        .replaceAll(RegExp(r'by @[a-zA-Z0-9_\-]+ in[^\n]*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\n\s*\n+'), '\n')
+        .trim();
+
+    if (cleaned.isEmpty || cleaned.length < 8) {
+      return '• Pembaruan fitur terbaru versi $version\n• Peningkatan performa & kestabilan aplikasi\n• Perbaikan bug dan optimasi obrolan';
+    }
+    return cleaned;
   }
 }

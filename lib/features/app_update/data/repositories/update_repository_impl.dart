@@ -36,20 +36,42 @@ class UpdateRepositoryImpl implements UpdateRepository {
     void Function(int received, int total) onProgress,
   ) async {
     try {
-      final tempDir = await getTemporaryDirectory();
-      final savePath = '${tempDir.path}/update.apk';
+      Directory dir;
+      try {
+        dir = await getExternalStorageDirectory() ??
+            await getApplicationSupportDirectory();
+      } catch (_) {
+        dir = await getTemporaryDirectory();
+      }
+
+      final savePath = '${dir.path}/LightChat_update.apk';
 
       // Delete existing file if present
       final file = File(savePath);
       if (await file.exists()) {
-        await file.delete();
+        try {
+          await file.delete();
+        } catch (_) {}
       }
 
       await _dio.download(
         downloadUrl,
         savePath,
         onReceiveProgress: onProgress,
+        options: Options(
+          followRedirects: true,
+          maxRedirects: 5,
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+          },
+        ),
       );
+
+      // Verify downloaded file size
+      if (!await file.exists() || (await file.length()) == 0) {
+        return Left(ServerFailure('Berkas unduhan kosong atau gagal disimpan.'));
+      }
 
       // Trigger package installer
       final result = await OpenFilex.open(
@@ -60,10 +82,11 @@ class UpdateRepositoryImpl implements UpdateRepository {
       if (result.type == ResultType.done) {
         return const Right('Installer launched');
       } else {
-        return Left(ServerFailure('Failed to open installer: ${result.message}'));
+        return Left(ServerFailure(
+            'Gagal membuka installer: ${result.message ?? "Izin instalasi tidak diberikan"}'));
       }
     } catch (e) {
-      return Left(ServerFailure('Failed to download update: $e'));
+      return Left(ServerFailure('Gagal mengunduh pembaruan: $e'));
     }
   }
 }
