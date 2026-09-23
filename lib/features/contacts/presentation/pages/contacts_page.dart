@@ -15,7 +15,7 @@ import '../../../chat/domain/usecases/create_or_get_chat.dart';
 import '../bloc/contacts_bloc.dart';
 import '../bloc/contacts_event.dart';
 import '../bloc/contacts_state.dart';
-import '../domain/usecases/find_user_by_phone.dart';
+import '../../domain/usecases/find_user_by_phone.dart';
 
 class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
