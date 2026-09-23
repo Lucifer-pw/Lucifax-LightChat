@@ -7,6 +7,7 @@ import '../../features/app_update/data/datasources/github_release_datasource.dar
 import '../../features/app_update/data/repositories/update_repository_impl.dart';
 import '../../features/app_update/domain/repositories/update_repository.dart';
 import '../../features/app_update/domain/usecases/check_for_update.dart';
+import '../../features/app_update/domain/usecases/download_apk.dart';
 import '../../features/auth/data/datasources/auth_remote_datasource.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
@@ -34,6 +35,7 @@ import '../../features/chat/presentation/bloc/chat_room/chat_room_bloc.dart';
 import '../../features/contacts/data/datasources/contacts_remote_datasource.dart';
 import '../../features/contacts/data/repositories/contacts_repository_impl.dart';
 import '../../features/contacts/domain/repositories/contacts_repository.dart';
+import '../../features/contacts/domain/usecases/find_user_by_phone.dart';
 import '../../features/contacts/domain/usecases/sync_contacts.dart';
 import '../../features/contacts/presentation/bloc/contacts_bloc.dart';
 
@@ -120,6 +122,7 @@ Future<void> initDependencies() async {
     () => ContactsRepositoryImpl(remoteDataSource: getIt()),
   );
   getIt.registerLazySingleton(() => SyncContacts(getIt()));
+  getIt.registerLazySingleton(() => FindUserByPhone(getIt()));
   getIt.registerFactory(() => ContactsBloc(syncContacts: getIt()));
 
   // ----------------------------------------------------
@@ -132,4 +135,5 @@ Future<void> initDependencies() async {
     () => UpdateRepositoryImpl(dataSource: getIt()),
   );
   getIt.registerLazySingleton(() => CheckForUpdate(getIt()));
+  getIt.registerLazySingleton(() => DownloadAndInstallApk(getIt()));
 }

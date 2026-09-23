@@ -1,4 +1,4 @@
-﻿import 'package:dartz/dartz.dart';
+import 'package:dartz/dartz.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../domain/entities/contact_entity.dart';
@@ -17,6 +17,18 @@ class ContactsRepositoryImpl implements ContactsRepository {
       return Right(contacts);
     } on PermissionException catch (e) {
       return Left(PermissionFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ContactEntity?>> findUserByPhoneNumber(String phoneNumber) async {
+    try {
+      final contact = await remoteDataSource.findUserByPhoneNumber(phoneNumber);
+      return Right(contact);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

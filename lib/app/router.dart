@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/pages/otp_verification_page.dart';
 import '../features/auth/presentation/pages/phone_input_page.dart';
 import '../features/auth/presentation/pages/profile_setup_page.dart';
+import '../features/auth/presentation/pages/qr_display_page.dart';
 import '../features/auth/presentation/pages/qr_scanner_page.dart';
 import '../features/auth/presentation/pages/splash_page.dart';
 import '../features/auth/presentation/pages/welcome_page.dart';
@@ -78,6 +79,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/qr-scanner',
       builder: (context, state) => const QrScannerPage(),
+    ),
+    GoRoute(
+      path: '/web-login',
+      builder: (context, state) => const QrDisplayPage(),
     ),
   ],
 );

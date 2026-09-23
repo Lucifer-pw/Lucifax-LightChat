@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../../../../core/constants/firebase_constants.dart';
 import '../../../../core/errors/exceptions.dart';
@@ -7,6 +7,7 @@ import '../../domain/entities/contact_entity.dart';
 
 abstract class ContactsRemoteDataSource {
   Future<List<ContactEntity>> getDeviceContactsAndMatch();
+  Future<ContactEntity?> findUserByPhoneNumber(String phoneNumber);
 }
 
 class ContactsRemoteDataSourceImpl implements ContactsRemoteDataSource {
@@ -75,6 +76,34 @@ class ContactsRemoteDataSourceImpl implements ContactsRemoteDataSource {
       return matchedContacts;
     } catch (e) {
       if (e is PermissionException) rethrow;
+      throw ServerException(e.toString());
+    }
+  }
+
+  @override
+  Future<ContactEntity?> findUserByPhoneNumber(String phoneNumber) async {
+    try {
+      final normalized = PhoneNumberFormatter.toE164(phoneNumber);
+      final query = await _firestore
+          .collection(FirebaseConstants.usersCollection)
+          .where('phoneNumber', isEqualTo: normalized)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) return null;
+
+      final doc = query.docs.first;
+      final data = doc.data();
+      return ContactEntity(
+        id: doc.id,
+        name: data['displayName'] ?? normalized,
+        phoneNumber: normalized,
+        registeredUid: doc.id,
+        photoUrl: data['photoUrl'],
+        bio: data['bio'],
+        isRegistered: true,
+      );
+    } catch (e) {
       throw ServerException(e.toString());
     }
   }
