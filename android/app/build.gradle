@@ -25,7 +25,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.lucifax.lucifax_lightchat"
-    compileSdk flutter.compileSdkVersion
+    compileSdk 35
     ndkVersion flutter.ndkVersion
 
     compileOptions {
