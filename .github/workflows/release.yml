@@ -1,9 +1,13 @@
-﻿name: Build & Release APK
+name: Build & Release APK
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -36,14 +40,20 @@ jobs:
 
       - name: Rename Release Asset
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="v1.0.0"
+          fi
           mv build/app/outputs/flutter-apk/app-release.apk LightChat_${VERSION}.apk
+          echo "RELEASE_TAG=${VERSION}" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: LightChat_*.apk
-          name: Lucifax LightChat ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Lucifax LightChat ${{ env.RELEASE_TAG }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
