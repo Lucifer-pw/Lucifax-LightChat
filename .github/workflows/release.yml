@@ -35,6 +35,10 @@ jobs:
       - name: Run Tests
         run: flutter test
 
+      - name: Setup Android SDK
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "build-tools;34.0.0" "platforms;android-34" || true
+
       - name: Build Android Release APK
         run: flutter build apk --release
 
