@@ -28,11 +28,9 @@ subprojects {
 // Force all subprojects (including plugins like audioplayers_android)
 // to use compileSdk 34 so the CI aapt2 can process resources correctly.
 subprojects {
-    afterEvaluate { project ->
-        if (project.plugins.hasPlugin('com.android.library')) {
-            project.android {
-                compileSdkVersion 34
-            }
+    project.plugins.withId('com.android.library') {
+        project.android {
+            compileSdkVersion 34
         }
     }
 }
