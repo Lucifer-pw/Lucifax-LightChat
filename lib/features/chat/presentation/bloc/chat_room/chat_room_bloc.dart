@@ -1,10 +1,12 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../domain/entities/message_entity.dart';
+import '../../../domain/usecases/delete_message.dart';
 import '../../../domain/usecases/get_messages_stream.dart';
 import '../../../domain/usecases/mark_as_read.dart';
 import '../../../domain/usecases/send_message.dart';
 import '../../../domain/usecases/set_typing_status.dart';
+import '../../../domain/usecases/upload_chat_media.dart';
 import 'chat_room_event.dart';
 import 'chat_room_state.dart';
 
@@ -13,6 +15,8 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
   final SendMessage sendMessage;
   final MarkAsRead markAsRead;
   final SetTypingStatus setTypingStatus;
+  final UploadChatMedia uploadChatMedia;
+  final DeleteMessage deleteMessage;
   StreamSubscription<List<MessageEntity>>? _messagesSubscription;
 
   ChatRoomBloc({
@@ -20,10 +24,14 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
     required this.sendMessage,
     required this.markAsRead,
     required this.setTypingStatus,
+    required this.uploadChatMedia,
+    required this.deleteMessage,
   }) : super(ChatRoomInitial()) {
     on<LoadMessagesEvent>(_onLoadMessages);
     on<MessagesUpdatedEvent>(_onMessagesUpdated);
     on<SendTextMessageEvent>(_onSendTextMessage);
+    on<SendMediaMessageEvent>(_onSendMediaMessage);
+    on<DeleteMessageEvent>(_onDeleteMessage);
     on<MarkChatAsReadEvent>(_onMarkChatAsRead);
     on<SetTypingEvent>(_onSetTyping);
   }
@@ -36,7 +44,11 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
     markAsRead(chatId: event.chatId, currentUserId: event.currentUserId);
 
     _messagesSubscription = getMessagesStream(event.chatId).listen(
-      (messages) => add(MessagesUpdatedEvent(messages)),
+      (messages) {
+        // Filter out messages deleted for this user
+        final filtered = messages.where((m) => !m.deletedFor.contains(event.currentUserId)).toList();
+        add(MessagesUpdatedEvent(filtered));
+      },
       onError: (err) => emit(ChatRoomError(err.toString())),
     );
   }
@@ -54,6 +66,47 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       content: event.content,
       type: 'text',
       replyTo: event.replyTo,
+    );
+  }
+
+  Future<void> _onSendMediaMessage(
+    SendMediaMessageEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
+    final uploadResult = await uploadChatMedia(
+      chatId: event.chatId,
+      filePath: event.filePath,
+      fileName: event.fileName,
+    );
+
+    await uploadResult.fold(
+      (failure) async {
+        // Handle upload failure
+      },
+      (mediaUrl) async {
+        await sendMessage(
+          chatId: event.chatId,
+          content: mediaUrl,
+          type: event.type,
+          mediaInfo: {
+            'fileName': event.fileName,
+            'caption': event.caption,
+          },
+          replyTo: event.replyTo,
+        );
+      },
+    );
+  }
+
+  Future<void> _onDeleteMessage(
+    DeleteMessageEvent event,
+    Emitter<ChatRoomState> emit,
+  ) async {
+    await deleteMessage(
+      chatId: event.chatId,
+      messageId: event.messageId,
+      currentUserId: event.currentUserId,
+      forEveryone: event.forEveryone,
     );
   }
 

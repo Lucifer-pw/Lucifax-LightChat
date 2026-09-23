@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/di/injection.dart';
@@ -71,7 +71,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             icon: const Icon(Icons.more_vert_rounded),
             color: AppColors.surface,
             onSelected: (value) {
-              if (value == 'profile') {
+              if (value == 'new_group') {
+                context.push('/create-group');
+              } else if (value == 'profile') {
                 context.push('/profile');
               } else if (value == 'settings') {
                 context.push('/appearance-settings');
@@ -80,6 +82,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'new_group',
+                child: Text('New Group'),
+              ),
               const PopupMenuItem(
                 value: 'qr_web',
                 child: Text('Linked Devices (LightChatWeb)'),
@@ -101,6 +107,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           indicatorWeight: 3,
           labelStyle: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
           unselectedLabelStyle: AppTextStyles.bodyMedium,
+          onTap: (_) => setState(() {}),
           tabs: const [
             Tab(text: 'CHATS (PRIVATE)'),
             Tab(text: 'GROUPS'),
@@ -118,8 +125,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/contacts'),
-        child: const Icon(Icons.chat_bubble_rounded),
+        onPressed: () {
+          if (_tabController.index == 1) {
+            context.push('/create-group');
+          } else {
+            context.push('/contacts');
+          }
+        },
+        child: Icon(_tabController.index == 1 ? Icons.group_add_rounded : Icons.chat_bubble_rounded),
       ),
     );
   }

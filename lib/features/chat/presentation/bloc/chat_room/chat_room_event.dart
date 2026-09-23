@@ -1,4 +1,4 @@
-﻿import 'package:equatable/equatable.dart';
+import 'package:equatable/equatable.dart';
 import '../../../domain/entities/message_entity.dart';
 
 abstract class ChatRoomEvent extends Equatable {
@@ -60,4 +60,42 @@ class SetTypingEvent extends ChatRoomEvent {
 
   @override
   List<Object?> get props => [chatId, userId, isTyping];
+}
+
+class SendMediaMessageEvent extends ChatRoomEvent {
+  final String chatId;
+  final String filePath;
+  final String fileName;
+  final String type; // "image" | "video" | "file" | "audio"
+  final String? caption;
+  final Map<String, dynamic>? replyTo;
+
+  const SendMediaMessageEvent({
+    required this.chatId,
+    required this.filePath,
+    required this.fileName,
+    required this.type,
+    this.caption,
+    this.replyTo,
+  });
+
+  @override
+  List<Object?> get props => [chatId, filePath, fileName, type, caption, replyTo];
+}
+
+class DeleteMessageEvent extends ChatRoomEvent {
+  final String chatId;
+  final String messageId;
+  final String currentUserId;
+  final bool forEveryone;
+
+  const DeleteMessageEvent({
+    required this.chatId,
+    required this.messageId,
+    required this.currentUserId,
+    required this.forEveryone,
+  });
+
+  @override
+  List<Object?> get props => [chatId, messageId, currentUserId, forEveryone];
 }

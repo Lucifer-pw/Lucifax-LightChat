@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
@@ -20,12 +20,15 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/chat/data/datasources/chat_remote_datasource.dart';
 import '../../features/chat/data/repositories/chat_repository_impl.dart';
 import '../../features/chat/domain/repositories/chat_repository.dart';
+import '../../features/chat/domain/usecases/create_group_chat.dart';
 import '../../features/chat/domain/usecases/create_or_get_chat.dart';
+import '../../features/chat/domain/usecases/delete_message.dart';
 import '../../features/chat/domain/usecases/get_chats_stream.dart';
 import '../../features/chat/domain/usecases/get_messages_stream.dart';
 import '../../features/chat/domain/usecases/mark_as_read.dart';
 import '../../features/chat/domain/usecases/send_message.dart';
 import '../../features/chat/domain/usecases/set_typing_status.dart';
+import '../../features/chat/domain/usecases/upload_chat_media.dart';
 import '../../features/chat/presentation/bloc/chat_list/chat_list_bloc.dart';
 import '../../features/chat/presentation/bloc/chat_room/chat_room_bloc.dart';
 import '../../features/contacts/data/datasources/contacts_remote_datasource.dart';
@@ -79,6 +82,7 @@ Future<void> initDependencies() async {
     () => ChatRemoteDataSourceImpl(
       firestore: getIt(),
       firebaseAuth: getIt(),
+      storage: getIt(),
     ),
   );
   getIt.registerLazySingleton<ChatRepository>(
@@ -89,6 +93,9 @@ Future<void> initDependencies() async {
   getIt.registerLazySingleton(() => SendMessage(getIt()));
   getIt.registerLazySingleton(() => MarkAsRead(getIt()));
   getIt.registerLazySingleton(() => CreateOrGetPrivateChat(getIt()));
+  getIt.registerLazySingleton(() => CreateGroupChat(getIt()));
+  getIt.registerLazySingleton(() => UploadChatMedia(getIt()));
+  getIt.registerLazySingleton(() => DeleteMessage(getIt()));
   getIt.registerLazySingleton(() => SetTypingStatus(getIt()));
 
   getIt.registerFactory(() => ChatListBloc(getChatsStream: getIt()));
@@ -98,6 +105,8 @@ Future<void> initDependencies() async {
       sendMessage: getIt(),
       markAsRead: getIt(),
       setTypingStatus: getIt(),
+      uploadChatMedia: getIt(),
+      deleteMessage: getIt(),
     ),
   );
 

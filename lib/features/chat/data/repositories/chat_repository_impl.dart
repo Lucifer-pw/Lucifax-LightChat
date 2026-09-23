@@ -1,4 +1,4 @@
-﻿import 'package:dartz/dartz.dart';
+import 'package:dartz/dartz.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../domain/entities/chat_entity.dart';
@@ -79,6 +79,72 @@ class ChatRepositoryImpl implements ChatRepository {
         otherUserPhoto: otherUserPhoto,
       );
       return Right(chat);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message, e.code));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ChatEntity>> createGroupChat({
+    required String name,
+    required String currentUserId,
+    required List<String> participantIds,
+    String? photoUrl,
+    String? description,
+  }) async {
+    try {
+      final chat = await remoteDataSource.createGroupChat(
+        name: name,
+        currentUserId: currentUserId,
+        participantIds: participantIds,
+        photoUrl: photoUrl,
+        description: description,
+      );
+      return Right(chat);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message, e.code));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> uploadChatMedia({
+    required String chatId,
+    required String filePath,
+    required String fileName,
+  }) async {
+    try {
+      final url = await remoteDataSource.uploadChatMedia(
+        chatId: chatId,
+        filePath: filePath,
+        fileName: fileName,
+      );
+      return Right(url);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message, e.code));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> deleteMessage({
+    required String chatId,
+    required String messageId,
+    required String currentUserId,
+    required bool forEveryone,
+  }) async {
+    try {
+      await remoteDataSource.deleteMessage(
+        chatId: chatId,
+        messageId: messageId,
+        currentUserId: currentUserId,
+        forEveryone: forEveryone,
+      );
+      return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message, e.code));
     } catch (e) {

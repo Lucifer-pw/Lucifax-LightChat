@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/di/injection.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -29,7 +30,18 @@ class _ContactsPageState extends State<ContactsPage> {
   @override
   void initState() {
     super.initState();
-    _contactsBloc = getIt<ContactsBloc>()..add(FetchContactsEvent());
+    _contactsBloc = getIt<ContactsBloc>();
+    _requestPermissionAndFetch();
+  }
+
+  Future<void> _requestPermissionAndFetch() async {
+    final granted = await FlutterContacts.requestPermission(readonly: true);
+    if (granted) {
+      _contactsBloc.add(FetchContactsEvent());
+    } else {
+      // Permission denied — bloc will show error state when it tries
+      _contactsBloc.add(FetchContactsEvent());
+    }
   }
 
   @override
