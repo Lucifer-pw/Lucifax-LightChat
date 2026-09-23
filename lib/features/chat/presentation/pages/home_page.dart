@@ -9,6 +9,10 @@ import '../../../app_update/domain/usecases/check_for_update.dart';
 import '../../../app_update/presentation/widgets/update_dialog.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../music/presentation/widgets/global_mini_player.dart';
+import '../../../status/presentation/bloc/status_bloc.dart';
+import '../../../status/presentation/bloc/status_event.dart';
+import '../../../status/presentation/pages/status_tab_page.dart';
 import '../bloc/chat_list/chat_list_bloc.dart';
 import '../bloc/chat_list/chat_list_event.dart';
 import '../bloc/chat_list/chat_list_state.dart';
@@ -30,7 +34,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _privateChatBloc = getIt<ChatListBloc>();
     _groupChatBloc = getIt<ChatListBloc>();
 
@@ -38,6 +42,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     if (authState is AuthenticatedState) {
       _privateChatBloc.add(LoadChatsEvent(userId: authState.user.uid, type: 'private'));
       _groupChatBloc.add(LoadChatsEvent(userId: authState.user.uid, type: 'group'));
+      context.read<StatusBloc>().add(LoadStatusesEvent(userId: authState.user.uid));
     }
 
     // Auto-check for updates
@@ -113,6 +118,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             onSelected: (value) {
               if (value == 'new_group') {
                 context.push('/create-group');
+              } else if (value == 'music_lounge') {
+                context.push('/music-browse');
               } else if (value == 'profile') {
                 context.push('/profile');
               } else if (value == 'settings') {
@@ -127,6 +134,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               const PopupMenuItem(
                 value: 'new_group',
                 child: Text('New Group'),
+              ),
+              const PopupMenuItem(
+                value: 'music_lounge',
+                child: Row(
+                  children: [
+                    Icon(Icons.music_note_rounded, size: 18, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text('Music Lounge'),
+                  ],
+                ),
               ),
               const PopupMenuItem(
                 value: 'qr_web',
@@ -162,31 +179,45 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           unselectedLabelStyle: AppTextStyles.bodyMedium,
           onTap: (_) => setState(() {}),
           tabs: const [
-            Tab(text: 'CHATS (PRIVATE)'),
+            Tab(text: 'CHATS'),
+            Tab(text: 'STATUS'),
             Tab(text: 'GROUPS'),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          // Tab 1: Private Chats
-          _buildChatListView(_privateChatBloc, currentUserId, isGroup: false),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Tab 1: Private Chats
+                _buildChatListView(_privateChatBloc, currentUserId, isGroup: false),
 
-          // Tab 2: Group Chats
-          _buildChatListView(_groupChatBloc, currentUserId, isGroup: true),
+                // Tab 2: Status 24h
+                const StatusTabPage(),
+
+                // Tab 3: Group Chats
+                _buildChatListView(_groupChatBloc, currentUserId, isGroup: true),
+              ],
+            ),
+          ),
+          // Global Mini-Player bar
+          const GlobalMiniPlayer(),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (_tabController.index == 1) {
-            context.push('/create-group');
-          } else {
-            context.push('/contacts');
-          }
-        },
-        child: Icon(_tabController.index == 1 ? Icons.group_add_rounded : Icons.chat_bubble_rounded),
-      ),
+      floatingActionButton: _tabController.index == 1
+          ? null // Status page has its own dedicated dual-action FABs (text + camera)
+          : FloatingActionButton(
+              onPressed: () {
+                if (_tabController.index == 2) {
+                  context.push('/create-group');
+                } else {
+                  context.push('/contacts');
+                }
+              },
+              child: Icon(_tabController.index == 2 ? Icons.group_add_rounded : Icons.chat_bubble_rounded),
+            ),
     );
   }
 
@@ -273,3 +304,4 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return const SizedBox.shrink();
   }
 }
+

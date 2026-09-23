@@ -38,6 +38,24 @@ import '../../features/contacts/domain/repositories/contacts_repository.dart';
 import '../../features/contacts/domain/usecases/find_user_by_phone.dart';
 import '../../features/contacts/domain/usecases/sync_contacts.dart';
 import '../../features/contacts/presentation/bloc/contacts_bloc.dart';
+import '../../core/theme/appearance_cubit.dart';
+import '../../features/status/data/datasources/status_remote_datasource.dart';
+import '../../features/status/data/repositories/status_repository_impl.dart';
+import '../../features/status/domain/repositories/status_repository.dart';
+import '../../features/status/domain/usecases/create_media_status.dart';
+import '../../features/status/domain/usecases/create_text_status.dart';
+import '../../features/status/domain/usecases/delete_status_item.dart';
+import '../../features/status/domain/usecases/get_my_status.dart';
+import '../../features/status/domain/usecases/get_recent_statuses.dart';
+import '../../features/status/domain/usecases/mark_status_viewed.dart';
+import '../../features/status/presentation/bloc/status_bloc.dart';
+import '../../features/music/data/datasources/music_remote_datasource.dart';
+import '../../features/music/data/repositories/music_repository_impl.dart';
+import '../../features/music/domain/repositories/music_repository.dart';
+import '../../features/music/domain/usecases/delete_music_track.dart';
+import '../../features/music/domain/usecases/get_music_tracks.dart';
+import '../../features/music/domain/usecases/upload_music_track.dart';
+import '../../features/music/presentation/bloc/music_player_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -136,4 +154,61 @@ Future<void> initDependencies() async {
   );
   getIt.registerLazySingleton(() => CheckForUpdate(getIt()));
   getIt.registerLazySingleton(() => DownloadAndInstallApk(getIt()));
+
+  // ----------------------------------------------------
+  // Status Feature (Phase 3)
+  // ----------------------------------------------------
+  getIt.registerLazySingleton<StatusRemoteDataSource>(
+    () => StatusRemoteDataSourceImpl(
+      firestore: getIt(),
+      storage: getIt(),
+    ),
+  );
+  getIt.registerLazySingleton<StatusRepository>(
+    () => StatusRepositoryImpl(remoteDataSource: getIt()),
+  );
+  getIt.registerLazySingleton(() => GetRecentStatuses(getIt()));
+  getIt.registerLazySingleton(() => GetMyStatus(getIt()));
+  getIt.registerLazySingleton(() => CreateTextStatus(getIt()));
+  getIt.registerLazySingleton(() => CreateMediaStatus(getIt()));
+  getIt.registerLazySingleton(() => MarkStatusViewed(getIt()));
+  getIt.registerLazySingleton(() => DeleteStatusItem(getIt()));
+
+  getIt.registerFactory(
+    () => StatusBloc(
+      getRecentStatuses: getIt(),
+      getMyStatus: getIt(),
+      createTextStatus: getIt(),
+      createMediaStatus: getIt(),
+      markStatusViewed: getIt(),
+      deleteStatusItem: getIt(),
+    ),
+  );
+
+  // ----------------------------------------------------
+  // Music Feature (Phase 3)
+  // ----------------------------------------------------
+  getIt.registerLazySingleton<MusicRemoteDataSource>(
+    () => MusicRemoteDataSourceImpl(
+      firestore: getIt(),
+      storage: getIt(),
+    ),
+  );
+  getIt.registerLazySingleton<MusicRepository>(
+    () => MusicRepositoryImpl(remoteDataSource: getIt()),
+  );
+  getIt.registerLazySingleton(() => GetMusicTracks(getIt()));
+  getIt.registerLazySingleton(() => UploadMusicTrack(getIt()));
+  getIt.registerLazySingleton(() => DeleteMusicTrack(getIt()));
+
+  getIt.registerLazySingleton<MusicPlayerCubit>(
+    () => MusicPlayerCubit(),
+  );
+
+  // ----------------------------------------------------
+  // Appearance / Theme (Phase 3)
+  // ----------------------------------------------------
+  getIt.registerLazySingleton<AppearanceCubit>(
+    () => AppearanceCubit(),
+  );
 }

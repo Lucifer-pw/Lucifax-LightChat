@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/di/injection.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/appearance_cubit.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/loading_indicator.dart';
@@ -193,12 +195,37 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: BlocBuilder<ChatRoomBloc, ChatRoomState>(
-              bloc: _chatRoomBloc,
-              builder: (context, state) {
+      body: Builder(
+        builder: (context) {
+          final appearance = context.watch<AppearanceCubit?>()?.state;
+          final wallpaperType = appearance?.wallpaperType ?? 'default';
+          final customPath = appearance?.customWallpaperPath;
+
+          BoxDecoration bgDecoration;
+          if (wallpaperType == 'solid_dark') {
+            bgDecoration = const BoxDecoration(color: Color(0xFF0B141B));
+          } else if (wallpaperType == 'solid_forest') {
+            bgDecoration = const BoxDecoration(color: Color(0xFF06201B));
+          } else if (wallpaperType == 'custom' && customPath != null && File(customPath).existsSync()) {
+            bgDecoration = BoxDecoration(
+              image: DecorationImage(
+                image: FileImage(File(customPath)),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.3), BlendMode.darken),
+              ),
+            );
+          } else {
+            bgDecoration = const BoxDecoration(color: AppColors.background);
+          }
+
+          return Container(
+            decoration: bgDecoration,
+            child: Column(
+              children: [
+                Expanded(
+                  child: BlocBuilder<ChatRoomBloc, ChatRoomState>(
+                    bloc: _chatRoomBloc,
+                    builder: (context, state) {
                 if (state is ChatRoomLoading) {
                   return const LoadingIndicator();
                 } else if (state is ChatRoomError) {
@@ -261,6 +288,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           ),
         ],
       ),
+    );
+  },
+),
     );
   }
 }

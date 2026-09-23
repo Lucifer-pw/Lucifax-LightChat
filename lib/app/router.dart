@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,8 +14,14 @@ import '../features/chat/presentation/pages/chat_room_page.dart';
 import '../features/chat/presentation/pages/create_group_page.dart';
 import '../features/chat/presentation/pages/home_page.dart';
 import '../features/contacts/presentation/pages/contacts_page.dart';
+import '../features/music/presentation/pages/full_music_player_page.dart';
+import '../features/music/presentation/pages/music_browse_page.dart';
 import '../features/profile/presentation/pages/appearance_settings_page.dart';
 import '../features/profile/presentation/pages/profile_page.dart';
+import '../features/status/domain/entities/user_status_group.dart';
+import '../features/status/presentation/pages/create_media_status_page.dart';
+import '../features/status/presentation/pages/create_text_status_page.dart';
+import '../features/status/presentation/pages/status_viewer_page.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -84,5 +91,32 @@ final GoRouter appRouter = GoRouter(
       path: '/web-login',
       builder: (context, state) => const QrDisplayPage(),
     ),
+    GoRoute(
+      path: '/status-viewer',
+      builder: (context, state) {
+        final group = state.extra as UserStatusGroup;
+        return StatusViewerPage(statusGroup: group);
+      },
+    ),
+    GoRoute(
+      path: '/create-text-status',
+      builder: (context, state) => const CreateTextStatusPage(),
+    ),
+    GoRoute(
+      path: '/create-media-status',
+      builder: (context, state) {
+        final file = state.extra as File;
+        return CreateMediaStatusPage(file: file);
+      },
+    ),
+    GoRoute(
+      path: '/music-browse',
+      builder: (context, state) => const MusicBrowsePage(),
+    ),
+    GoRoute(
+      path: '/music-player',
+      builder: (context, state) => const FullMusicPlayerPage(),
+    ),
   ],
 );
+

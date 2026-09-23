@@ -1,9 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/theme/appearance_cubit.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../domain/entities/message_entity.dart';
@@ -85,6 +87,11 @@ class MessageBubble extends StatelessWidget {
     final isMe = message.isSentByMe(currentUserId);
     final isDeleted = message.isDeleted;
 
+    final appearance = context.watch<AppearanceCubit?>()?.state;
+    final sentColor = appearance?.sentBubbleColor ?? AppColors.bubbleSent;
+    final isRounded = (appearance?.bubbleStyle ?? 'rounded') == 'rounded';
+    final radiusVal = isRounded ? AppSizes.r12 : 4.0;
+
     return GestureDetector(
       onLongPress: isDeleted ? null : () => _showOptions(context, isMe),
       child: Align(
@@ -96,12 +103,12 @@ class MessageBubble extends StatelessWidget {
             maxWidth: MediaQuery.sizeOf(context).width * 0.78,
           ),
           decoration: BoxDecoration(
-            color: isMe ? AppColors.bubbleSent : AppColors.bubbleReceived,
+            color: isMe ? sentColor : AppColors.bubbleReceived,
             borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(AppSizes.r12),
-              topRight: const Radius.circular(AppSizes.r12),
-              bottomLeft: Radius.circular(isMe ? AppSizes.r12 : 0),
-              bottomRight: Radius.circular(isMe ? 0 : AppSizes.r12),
+              topLeft: Radius.circular(radiusVal),
+              topRight: Radius.circular(radiusVal),
+              bottomLeft: Radius.circular(isMe ? radiusVal : 0),
+              bottomRight: Radius.circular(isMe ? 0 : radiusVal),
             ),
           ),
           child: Column(
