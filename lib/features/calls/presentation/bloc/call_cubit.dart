@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../data/services/webrtc_service.dart';
 import '../../domain/entities/call_entity.dart';
 import '../../domain/repositories/call_repository.dart';
@@ -40,48 +42,59 @@ class CallCubit extends Cubit<CallState> {
         isSpeakerOn: call.isVideo,
       ));
 
-      // 1. Initialize local camera / mic
+      // 1. Hook up callbacks FIRST before creating offer / peer connection
+      webrtcService.onIceCandidate = (candidate) {
+        debugPrint('[CallCubit] Saving callerCandidate to Firestore: ${candidate.candidate}');
+        callRepository.addCandidate(
+          call.callId,
+          'callerCandidates',
+          candidate.toMap(),
+        );
+      };
+
+      webrtcService.onRemoteStream = (stream) {
+        debugPrint('[CallCubit] Remote stream attached, videoTracks=${stream.getVideoTracks().length}, audioTracks=${stream.getAudioTracks().length}');
+        emit(state.copyWith(isRemoteVideoActive: stream.getVideoTracks().isNotEmpty));
+      };
+
+      webrtcService.onConnectionState = (connState) {
+        debugPrint('[CallCubit] PeerConnectionState: $connState');
+        if (connState == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+          debugPrint('[CallCubit] WebRTC Direct P2P Connected!');
+        } else if (connState == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+          debugPrint('[CallCubit] WebRTC Direct P2P Failed!');
+        }
+      };
+
+      // 2. Initialize local camera / mic
       await webrtcService.openUserMedia(isVideo: call.isVideo);
       await webrtcService.setSpeakerphone(call.isVideo);
 
-      // 2. Create WebRTC Offer
+      // 3. Create WebRTC Offer (this triggers local ICE candidate gathering)
       final offer = await webrtcService.createOffer(isVideo: call.isVideo);
 
-      // 3. Save call to Firestore
+      // 4. Listen for receiver candidates and call document updates
+      _listenToCandidates(call.callId, 'receiverCandidates');
+      _listenToCallDocument(call.callId);
+
+      // 5. Save call & offer to Firestore
       final makeCallResult = await makeCallUseCase.call(call, offer);
 
       makeCallResult.fold(
         (failure) {
+          debugPrint('[CallCubit] MakeCall failed: ${failure.message}');
           emit(state.copyWith(
             status: CallStatus.error,
             errorMessage: failure.message,
           ));
         },
         (callId) {
+          debugPrint('[CallCubit] Call initiated successfully, callId=$callId');
           emit(state.copyWith(status: CallStatus.calling));
-
-          // 4. Send local ICE candidates to Firestore
-          webrtcService.onIceCandidate = (candidate) {
-            callRepository.addCandidate(
-              call.callId,
-              'callerCandidates',
-              candidate.toMap(),
-            );
-          };
-
-          // 5. Listen for remote stream
-          webrtcService.onRemoteStream = (stream) {
-            emit(state.copyWith(isRemoteVideoActive: stream.getVideoTracks().isNotEmpty));
-          };
-
-          // 6. Listen for receiver candidates
-          _listenToCandidates(call.callId, 'receiverCandidates');
-
-          // 7. Listen for call updates from receiver (answer / reject)
-          _listenToCallDocument(call.callId);
         },
       );
     } catch (e) {
+      debugPrint('[CallCubit] startCall exception: $e');
       emit(state.copyWith(
         status: CallStatus.error,
         errorMessage: 'Failed to start call: $e',
@@ -98,55 +111,64 @@ class CallCubit extends Cubit<CallState> {
         isSpeakerOn: call.isVideo,
       ));
 
-      // 1. Initialize local camera / mic
+      // 1. Hook up callbacks FIRST before creating answer
+      webrtcService.onIceCandidate = (candidate) {
+        debugPrint('[CallCubit] Saving receiverCandidate to Firestore: ${candidate.candidate}');
+        callRepository.addCandidate(
+          call.callId,
+          'receiverCandidates',
+          candidate.toMap(),
+        );
+      };
+
+      webrtcService.onRemoteStream = (stream) {
+        debugPrint('[CallCubit] Remote stream attached, videoTracks=${stream.getVideoTracks().length}, audioTracks=${stream.getAudioTracks().length}');
+        emit(state.copyWith(isRemoteVideoActive: stream.getVideoTracks().isNotEmpty));
+      };
+
+      webrtcService.onConnectionState = (connState) {
+        debugPrint('[CallCubit] Receiver PeerConnectionState: $connState');
+        if (connState == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+          debugPrint('[CallCubit] Receiver WebRTC Direct P2P Connected!');
+        }
+      };
+
+      // 2. Initialize local camera / mic
       await webrtcService.openUserMedia(isVideo: call.isVideo);
       await webrtcService.setSpeakerphone(call.isVideo);
 
-      // 2. Create peer connection instance & set remote offer
+      // 3. Create peer connection instance & set remote offer
       await webrtcService.createPeerConnectionInstance(isVideo: call.isVideo);
       if (call.offer != null) {
         await webrtcService.setRemoteDescription(call.offer!);
       }
 
-      // 3. Create WebRTC Answer
+      // 4. Start listening to caller candidates and call termination
+      _listenToCandidates(call.callId, 'callerCandidates');
+      _listenToCallDocument(call.callId);
+
+      // 5. Create WebRTC Answer (this triggers local ICE candidate gathering)
       final answer = await webrtcService.createAnswer(isVideo: call.isVideo);
 
-      // 4. Save answer to Firestore & set status to connected
+      // 6. Save answer to Firestore & set status to connected
       final answerResult = await answerCallUseCase.call(call.callId, answer);
 
       answerResult.fold(
         (failure) {
+          debugPrint('[CallCubit] AnswerCall failed: ${failure.message}');
           emit(state.copyWith(
             status: CallStatus.error,
             errorMessage: failure.message,
           ));
         },
         (_) {
+          debugPrint('[CallCubit] Call answered successfully. Setting connected status.');
           emit(state.copyWith(status: CallStatus.connected));
           _startDurationTimer();
-
-          // 5. Send local ICE candidates
-          webrtcService.onIceCandidate = (candidate) {
-            callRepository.addCandidate(
-              call.callId,
-              'receiverCandidates',
-              candidate.toMap(),
-            );
-          };
-
-          // 6. Listen for remote stream
-          webrtcService.onRemoteStream = (stream) {
-            emit(state.copyWith(isRemoteVideoActive: stream.getVideoTracks().isNotEmpty));
-          };
-
-          // 7. Listen for caller candidates
-          _listenToCandidates(call.callId, 'callerCandidates');
-
-          // 8. Listen for call termination
-          _listenToCallDocument(call.callId);
         },
       );
     } catch (e) {
+      debugPrint('[CallCubit] acceptCall exception: $e');
       emit(state.copyWith(
         status: CallStatus.error,
         errorMessage: 'Failed to accept call: $e',
@@ -158,6 +180,7 @@ class CallCubit extends Cubit<CallState> {
     _candidatesSub?.cancel();
     _candidatesSub = callRepository.getCandidatesStream(callId, candidateType).listen(
       (candidates) {
+        debugPrint('[CallCubit] Received ${candidates.length} $candidateType from Firestore');
         for (final candidateMap in candidates) {
           final candidateStr = candidateMap['candidate']?.toString() ?? '';
           if (candidateStr.isNotEmpty && !_processedCandidateIds.contains(candidateStr)) {
@@ -165,6 +188,9 @@ class CallCubit extends Cubit<CallState> {
             webrtcService.addCandidate(candidateMap);
           }
         }
+      },
+      onError: (err) {
+        debugPrint('[CallCubit] Error in candidate stream ($candidateType): $err');
       },
     );
   }
@@ -180,6 +206,7 @@ class CallCubit extends Cubit<CallState> {
             call.answer != null &&
             state.status != CallStatus.connected &&
             !call.isEnded) {
+          debugPrint('[CallCubit] Caller received answer! Setting remote description.');
           await webrtcService.setRemoteDescription(call.answer!);
           emit(state.copyWith(
             status: CallStatus.connected,
@@ -190,12 +217,16 @@ class CallCubit extends Cubit<CallState> {
 
         // Call status changes to ended / rejected / busy
         if (call.isEnded && state.status != CallStatus.ended) {
+          debugPrint('[CallCubit] Call ended remotely with status: ${call.status}');
           _cleanUpResources();
           emit(state.copyWith(
             status: CallStatus.ended,
             call: call,
           ));
         }
+      },
+      onError: (err) {
+        debugPrint('[CallCubit] Error in call doc stream: $err');
       },
     );
   }

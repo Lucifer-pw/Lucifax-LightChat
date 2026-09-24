@@ -97,7 +97,8 @@ class CallRemoteDataSourceImpl implements CallRemoteDataSource {
           .collection(candidateType)
           .add(candidate);
     } catch (e) {
-      // Best-effort candidate addition
+      // ignore: avoid_print
+      print('[CallRemoteDataSource] Error adding candidate ($candidateType): $e');
     }
   }
 
