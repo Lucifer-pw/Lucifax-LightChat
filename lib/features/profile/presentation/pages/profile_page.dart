@@ -43,6 +43,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthenticatedState) {
       _cachedUser = authState.user;
+    } else {
+      context.read<AuthBloc>().add(CheckAuthStatusEvent());
     }
   }
 
@@ -421,9 +423,10 @@ class _ProfilePageState extends State<ProfilePage> {
         }
 
         if (_cachedUser == null) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            appBar: AppBar(title: const Text('Profile')),
+            body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
           );
         }
 

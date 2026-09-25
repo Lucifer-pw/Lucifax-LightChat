@@ -1,4 +1,4 @@
-﻿import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/usecases/get_current_user.dart';
 import '../../domain/usecases/save_user_profile.dart';
 import '../../domain/usecases/send_phone_otp.dart';
@@ -91,6 +91,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     SaveProfileEvent event,
     Emitter<AuthState> emit,
   ) async {
+    final previousUser = state is AuthenticatedState ? (state as AuthenticatedState).user : null;
     emit(const AuthLoading('Saving profile...'));
     final result = await saveUserProfile(
       displayName: event.displayName,
@@ -99,7 +100,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
 
     result.fold(
-      (failure) => emit(AuthErrorState(failure.message)),
+      (failure) {
+        emit(AuthErrorState(failure.message));
+        if (previousUser != null) {
+          emit(AuthenticatedState(previousUser));
+        }
+      },
       (user) => emit(AuthenticatedState(user)),
     );
   }
