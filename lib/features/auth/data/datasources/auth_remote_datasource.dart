@@ -176,13 +176,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       String? photoUrl;
 
-      if (imageFile != null) {
+      if (imageFile != null && imageFile.existsSync()) {
         final ref = _storage
             .ref()
             .child(FirebaseConstants.profilePhotosPath)
-            .child('${user.uid}.jpg');
+            .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-        final uploadTask = await ref.putFile(imageFile);
+        final metadata = SettableMetadata(contentType: 'image/jpeg');
+        final uploadTask = await ref.putFile(imageFile, metadata);
         photoUrl = await uploadTask.ref.getDownloadURL();
       }
 
