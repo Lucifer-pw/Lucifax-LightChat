@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'avatar_cropper_page.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
@@ -56,20 +57,30 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final pickedFile = await _picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 80,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 90,
       );
 
-      if (pickedFile != null && mounted && _cachedUser != null) {
-        setState(() => _isSaving = true);
-        context.read<AuthBloc>().add(
-              SaveProfileEvent(
-                displayName: _cachedUser!.displayName,
-                bio: _cachedUser!.bio,
-                imageFile: File(pickedFile.path),
-              ),
-            );
+      if (pickedFile != null && mounted) {
+        // Open WhatsApp-style Avatar Cropper
+        final croppedFile = await Navigator.push<File?>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AvatarCropperPage(imageFile: File(pickedFile.path)),
+          ),
+        );
+
+        if (croppedFile != null && mounted && _cachedUser != null) {
+          setState(() => _isSaving = true);
+          context.read<AuthBloc>().add(
+                SaveProfileEvent(
+                  displayName: _cachedUser!.displayName,
+                  bio: _cachedUser!.bio,
+                  imageFile: croppedFile,
+                ),
+              );
+        }
       }
     } catch (e) {
       if (mounted) {

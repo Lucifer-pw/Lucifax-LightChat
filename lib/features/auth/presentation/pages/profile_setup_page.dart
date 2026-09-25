@@ -1,8 +1,9 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../features/profile/presentation/pages/avatar_cropper_page.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/text_styles.dart';
@@ -34,14 +35,23 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 75,
-      maxWidth: 600,
+      imageQuality: 90,
+      maxWidth: 1200,
     );
 
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
+    if (pickedFile != null && mounted) {
+      final croppedFile = await Navigator.push<File?>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AvatarCropperPage(imageFile: File(pickedFile.path)),
+        ),
+      );
+
+      if (croppedFile != null && mounted) {
+        setState(() {
+          _selectedImage = croppedFile;
+        });
+      }
     }
   }
 

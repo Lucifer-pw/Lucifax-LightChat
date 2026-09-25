@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -177,14 +178,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       String? photoUrl;
 
       if (imageFile != null && imageFile.existsSync()) {
-        final ref = _storage
-            .ref()
-            .child(FirebaseConstants.profilePhotosPath)
-            .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+        try {
+          final ref = _storage
+              .ref()
+              .child(FirebaseConstants.profilePhotosPath)
+              .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
-        final metadata = SettableMetadata(contentType: 'image/jpeg');
-        final uploadTask = await ref.putFile(imageFile, metadata);
-        photoUrl = await uploadTask.ref.getDownloadURL();
+          final metadata = SettableMetadata(contentType: 'image/jpeg');
+          final uploadTask = await ref.putFile(imageFile, metadata);
+          photoUrl = await uploadTask.ref.getDownloadURL();
+        } catch (storageError) {
+          // If Firebase Storage is unavailable (e.g. requires Blaze plan), fall back to Base64 in Firestore directly
+          final bytes = await imageFile.readAsBytes();
+          final base64String = base64Encode(bytes);
+          photoUrl = 'data:image/jpeg;base64,$base64String';
+        }
       }
 
       final updateData = <String, dynamic>{

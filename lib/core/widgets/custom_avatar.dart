@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
@@ -32,26 +33,39 @@ class CustomAvatar extends StatelessWidget {
     Widget avatarContent;
 
     if (imageUrl != null && imageUrl!.isNotEmpty) {
-      avatarContent = CachedNetworkImage(
-        imageUrl: imageUrl!,
-        imageBuilder: (context, imageProvider) => CircleAvatar(
-          radius: radius,
-          backgroundImage: imageProvider,
-        ),
-        placeholder: (context, url) => CircleAvatar(
-          radius: radius,
-          backgroundColor: AppColors.surfaceLight,
-          child: const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primary,
+      if (imageUrl!.startsWith('data:image')) {
+        try {
+          final base64String = imageUrl!.split(',').last;
+          final bytes = base64Decode(base64String);
+          avatarContent = CircleAvatar(
+            radius: radius,
+            backgroundImage: MemoryImage(bytes),
+          );
+        } catch (_) {
+          avatarContent = _buildFallback();
+        }
+      } else {
+        avatarContent = CachedNetworkImage(
+          imageUrl: imageUrl!,
+          imageBuilder: (context, imageProvider) => CircleAvatar(
+            radius: radius,
+            backgroundImage: imageProvider,
+          ),
+          placeholder: (context, url) => CircleAvatar(
+            radius: radius,
+            backgroundColor: AppColors.surfaceLight,
+            child: const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
             ),
           ),
-        ),
-        errorWidget: (context, url, error) => _buildFallback(),
-      );
+          errorWidget: (context, url, error) => _buildFallback(),
+        );
+      }
     } else {
       avatarContent = _buildFallback();
     }
