@@ -47,6 +47,13 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
       (messages) {
         // Filter out messages deleted for this user
         final filtered = messages.where((m) => !m.deletedFor.contains(event.currentUserId)).toList();
+
+        // If there are unread messages sent by others, mark them as read in real-time
+        final hasUnread = filtered.any((m) => m.senderId != event.currentUserId && m.status != 'read');
+        if (hasUnread) {
+          markAsRead(chatId: event.chatId, currentUserId: event.currentUserId);
+        }
+
         add(MessagesUpdatedEvent(filtered));
       },
       onError: (err) => emit(ChatRoomError(err.toString())),

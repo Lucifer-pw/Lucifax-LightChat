@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/di/injection.dart';
+import '../../../../app/router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/text_styles.dart';
@@ -340,6 +341,17 @@ class _ContactsPageState extends State<ContactsPage> {
                         imageUrl: contact.photoUrl,
                         name: contact.name,
                         radius: 22,
+                        onTap: () {
+                          if (contact.registeredUid != null) {
+                            appRouter.push('/contact-profile', extra: {
+                              'userId': contact.registeredUid!,
+                              'displayName': contact.name,
+                              'photoUrl': contact.photoUrl,
+                              'phoneNumber': contact.phoneNumber,
+                              'about': contact.bio ?? 'Available',
+                            });
+                          }
+                        },
                       ),
                       title: Text(contact.name, style: AppTextStyles.chatTitle),
                       subtitle: Text(

@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/di/injection.dart';
+import '../../../../app/router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/theme/appearance_cubit.dart';
 import '../../../../core/theme/text_styles.dart';
@@ -37,6 +40,12 @@ class ChatRoomPage extends StatefulWidget {
 class _ChatRoomPageState extends State<ChatRoomPage> {
   late ChatRoomBloc _chatRoomBloc;
   MessageEntity? _replyingMessage;
+  StreamSubscription<DocumentSnapshot>? _otherUserSub;
+  bool _liveOtherUserOnline = false;
+  String? _liveOtherUserName;
+  String? _liveOtherUserPhoto;
+  String _liveOtherUserPhone = '';
+  String _liveOtherUserBio = '';
 
   @override
   void initState() {
@@ -45,17 +54,42 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthenticatedState) {
+      final currentUserId = authState.user.uid;
       _chatRoomBloc.add(
         LoadMessagesEvent(
           chatId: widget.chatId,
-          currentUserId: authState.user.uid,
+          currentUserId: currentUserId,
         ),
       );
+
+      // Listen to real-time online status and profile of the other user
+      if (widget.chat != null && !widget.chat!.isGroup) {
+        final otherUserId = widget.chat!.getOtherUserId(currentUserId);
+        if (otherUserId.isNotEmpty) {
+          _otherUserSub = FirebaseFirestore.instance
+              .collection('users')
+              .doc(otherUserId)
+              .snapshots()
+              .listen((snap) {
+            if (snap.exists && mounted) {
+              final data = snap.data() as Map<String, dynamic>? ?? {};
+              setState(() {
+                _liveOtherUserOnline = data['isOnline'] ?? false;
+                _liveOtherUserName = data['displayName'];
+                _liveOtherUserPhoto = data['photoUrl'];
+                _liveOtherUserPhone = data['phoneNumber'] ?? '';
+                _liveOtherUserBio = data['about'] ?? data['bio'] ?? '';
+              });
+            }
+          });
+        }
+      }
     }
   }
 
   @override
   void dispose() {
+    _otherUserSub?.cancel();
     _chatRoomBloc.close();
     super.dispose();
   }
@@ -147,30 +181,52 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     });
   }
 
+  void _navigateToContactInfo() {
+    final authState = context.read<AuthBloc>().state;
+    final currentUserId = authState is AuthenticatedState ? authState.user.uid : '';
+
+    if (widget.chat != null && !widget.chat!.isGroup) {
+      final otherUserId = widget.chat!.getOtherUserId(currentUserId);
+      if (otherUserId.isNotEmpty) {
+        appRouter.push('/contact-profile', extra: {
+          'userId': otherUserId,
+          'displayName': _liveOtherUserName ?? widget.chat!.getDisplayName(currentUserId),
+          'photoUrl': _liveOtherUserPhoto ?? widget.chat!.getDisplayPhoto(currentUserId),
+          'phoneNumber': _liveOtherUserPhone,
+          'about': _liveOtherUserBio,
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = context.watch<AuthBloc>().state;
     final currentUserId = authState is AuthenticatedState ? authState.user.uid : '';
-
-    final displayName = widget.chat?.getDisplayName(currentUserId) ?? 'Chat';
-    final photoUrl = widget.chat?.getDisplayPhoto(currentUserId);
-    final isOnline = widget.chat?.isOtherUserOnline(currentUserId) ?? false;
     final isGroup = widget.chat?.isGroup ?? false;
+
+    final displayName = isGroup
+        ? (widget.chat?.getDisplayName(currentUserId) ?? 'Group')
+        : (_liveOtherUserName ?? widget.chat?.getDisplayName(currentUserId) ?? 'Chat');
+    final photoUrl = isGroup
+        ? widget.chat?.getDisplayPhoto(currentUserId)
+        : (_liveOtherUserPhoto ?? widget.chat?.getDisplayPhoto(currentUserId));
+    final isOnline = isGroup ? false : _liveOtherUserOnline;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         titleSpacing: 0,
         title: InkWell(
-          onTap: () {
-            // Future: Navigate to contact or group details
-          },
+          onTap: _navigateToContactInfo,
           child: Row(
             children: [
               CustomAvatar(
                 imageUrl: photoUrl,
                 name: displayName,
                 radius: 18,
+                isOnline: isOnline,
+                showOnlineBadge: !isGroup,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -210,7 +266,9 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             icon: const Icon(Icons.more_vert_rounded),
             color: AppColors.surface,
             onSelected: (val) {
-              if (val == 'clear') {
+              if (val == 'info') {
+                _navigateToContactInfo();
+              } else if (val == 'clear') {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Chat options')),
                 );

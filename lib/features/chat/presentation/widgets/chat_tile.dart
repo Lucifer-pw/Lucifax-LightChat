@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/text_styles.dart';
@@ -30,6 +31,7 @@ class ChatTile extends StatelessWidget {
     final lastMessageText = lastMessage?['text'] ?? '';
     final lastMessageSenderId = lastMessage?['senderId'];
     final isMeSender = lastMessageSenderId == currentUserId;
+    final lastMessageStatus = lastMessage?['status']?.toString() ?? 'sent';
     final lastMessageTime = lastMessage?['timestamp'] != null
         ? (lastMessage!['timestamp'] as dynamic).toDate()
         : chat.updatedAt;
@@ -48,6 +50,20 @@ class ChatTile extends StatelessWidget {
               radius: 26,
               isOnline: isOnline,
               showOnlineBadge: !chat.isGroup,
+              onTap: () {
+                if (!chat.isGroup) {
+                  final otherUserId = chat.getOtherUserId(currentUserId);
+                  if (otherUserId.isNotEmpty) {
+                    appRouter.push('/contact-profile', extra: {
+                      'userId': otherUserId,
+                      'displayName': displayName,
+                      'photoUrl': photoUrl,
+                      'phoneNumber': '',
+                      'about': 'Available',
+                    });
+                  }
+                }
+              },
             ),
             AppSizes.hSpace16,
             Expanded(
@@ -78,7 +94,7 @@ class ChatTile extends StatelessWidget {
                   Row(
                     children: [
                       if (isMeSender && !isTyping) ...[
-                        const MessageStatusIcon(status: 'read'),
+                        MessageStatusIcon(status: lastMessageStatus),
                         AppSizes.hSpace4,
                       ],
                       Expanded(

@@ -75,7 +75,9 @@ Future<void> initDependencies() async {
   // Firebase Singletons
   getIt.registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance);
   getIt.registerLazySingleton<FirebaseFirestore>(() => FirebaseFirestore.instance);
-  getIt.registerLazySingleton<FirebaseStorage>(() => FirebaseStorage.instance);
+  getIt.registerLazySingleton<FirebaseStorage>(
+    () => FirebaseStorage.instanceFor(bucket: 'lucifax-lightchat.firebasestorage.app'),
+  );
 
   // ----------------------------------------------------
   // Auth Feature
@@ -241,7 +243,7 @@ Future<void> initDependencies() async {
   getIt.registerLazySingleton(() => GetIncomingCallsStream(getIt()));
   getIt.registerLazySingleton(() => GetCallHistory(getIt()));
 
-  getIt.registerFactory(
+  getIt.registerLazySingleton<CallCubit>(
     () => CallCubit(
       webrtcService: getIt(),
       makeCallUseCase: getIt(),

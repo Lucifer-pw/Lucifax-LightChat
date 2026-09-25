@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import '../../data/services/pip_service.dart';
 import '../../data/services/webrtc_service.dart';
 import '../../domain/entities/call_entity.dart';
 import '../../domain/repositories/call_repository.dart';
@@ -35,6 +36,7 @@ class CallCubit extends Cubit<CallState> {
 
   Future<void> startCall({required CallEntity call}) async {
     try {
+      PipService.setInCall(true);
       emit(state.copyWith(
         status: CallStatus.connecting,
         call: call,
@@ -104,6 +106,7 @@ class CallCubit extends Cubit<CallState> {
 
   Future<void> acceptCall({required CallEntity call}) async {
     try {
+      PipService.setInCall(true);
       emit(state.copyWith(
         status: CallStatus.connecting,
         call: call,
@@ -280,6 +283,7 @@ class CallCubit extends Cubit<CallState> {
   }
 
   void _cleanUpResources() {
+    PipService.setInCall(false);
     _timer?.cancel();
     _timer = null;
     _callSub?.cancel();
@@ -288,6 +292,11 @@ class CallCubit extends Cubit<CallState> {
     _candidatesSub = null;
     _processedCandidateIds.clear();
     webrtcService.dispose();
+  }
+
+  void resetCall() {
+    _cleanUpResources();
+    emit(const CallState());
   }
 
   @override

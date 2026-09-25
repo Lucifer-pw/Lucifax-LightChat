@@ -197,15 +197,16 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
         'unreadCount.$currentUserId': 0,
       });
 
-      // Update message read status
-      final unreadMessages = await chatRef
+      // Fetch recent messages and filter unread in memory to avoid index requirements
+      final messagesSnapshot = await chatRef
           .collection(FirebaseConstants.messagesSubcollection)
-          .where('status', isNotEqualTo: 'read')
+          .orderBy('createdAt', descending: true)
+          .limit(50)
           .get();
 
-      final toUpdate = unreadMessages.docs.where((doc) {
+      final toUpdate = messagesSnapshot.docs.where((doc) {
         final data = doc.data();
-        return data['senderId'] != currentUserId;
+        return data['senderId'] != currentUserId && data['status'] != 'read';
       }).toList();
 
       if (toUpdate.isNotEmpty) {

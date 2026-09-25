@@ -4,7 +4,9 @@ import '../core/theme/appearance_cubit.dart';
 import '../core/theme/app_theme.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../features/auth/presentation/bloc/auth_state.dart';
+import '../features/calls/presentation/bloc/call_cubit.dart';
 import '../features/calls/presentation/bloc/incoming_call_cubit.dart';
+import '../features/calls/presentation/widgets/global_mini_call_overlay.dart';
 import '../features/music/presentation/bloc/music_player_cubit.dart';
 import '../features/status/presentation/bloc/status_bloc.dart';
 import 'di/injection.dart';
@@ -31,6 +33,9 @@ class LightChatApp extends StatelessWidget {
         ),
         BlocProvider<IncomingCallCubit>(
           create: (context) => getIt<IncomingCallCubit>(),
+        ),
+        BlocProvider<CallCubit>(
+          create: (context) => getIt<CallCubit>(),
         ),
       ],
       child: MultiBlocListener(
@@ -70,6 +75,11 @@ class LightChatApp extends StatelessWidget {
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.dark,
           routerConfig: appRouter,
+          builder: (context, child) {
+            return GlobalMiniCallOverlay(
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
         ),
       ),
     );

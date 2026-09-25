@@ -62,6 +62,16 @@ class WebRTCService {
       }
     }
 
+    // Request Bluetooth connect permission on Android 12+ for Bluetooth earphones/speakers
+    try {
+      final btStatus = await Permission.bluetoothConnect.status;
+      if (!btStatus.isGranted) {
+        await Permission.bluetoothConnect.request();
+      }
+    } catch (e) {
+      debugPrint('[WebRTCService] Bluetooth permission check note: $e');
+    }
+
     return true;
   }
 
@@ -258,7 +268,11 @@ class WebRTCService {
 
   Future<void> setSpeakerphone(bool enable) async {
     try {
+      await Helper.ensureAudioSession();
       await Helper.setSpeakerphoneOn(enable);
+      if (!enable) {
+        await Helper.setSpeakerphoneOnButPreferBluetooth();
+      }
     } catch (e) {
       debugPrint('[WebRTCService] Error setting speakerphone: $e');
     }

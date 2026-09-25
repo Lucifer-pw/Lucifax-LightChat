@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../data/services/pip_service.dart';
 import '../../domain/entities/call_entity.dart';
 import '../bloc/call_cubit.dart';
 import '../bloc/call_state.dart';
@@ -34,16 +35,23 @@ class _CallPageState extends State<CallPage> {
     super.initState();
     _callCubit = getIt<CallCubit>();
 
-    if (widget.isCaller) {
-      _callCubit.startCall(call: widget.call);
-    } else {
-      _callCubit.acceptCall(call: widget.call);
+    final isSameCall = _callCubit.state.call?.callId == widget.call.callId;
+    final isCallActive = _callCubit.state.status != CallStatus.initial &&
+        _callCubit.state.status != CallStatus.ended &&
+        _callCubit.state.status != CallStatus.error;
+
+    if (!isSameCall || !isCallActive) {
+      if (widget.isCaller) {
+        _callCubit.startCall(call: widget.call);
+      } else {
+        _callCubit.acceptCall(call: widget.call);
+      }
     }
   }
 
   @override
   void dispose() {
-    _callCubit.close();
+    // Preserve _callCubit so call remains alive when minimized / navigating
     super.dispose();
   }
 
@@ -104,11 +112,11 @@ class _CallPageState extends State<CallPage> {
                   else
                     _buildVoiceView(otherUserName, otherUserPhoto, state),
 
-                  // 2. Top Header (Name, Status, Encryption badge)
+                  // 2. Top Header (Name, Status, Encryption badge, Minimize / PiP buttons)
                   Positioned(
-                    top: 16,
-                    left: 16,
-                    right: 16,
+                    top: 8,
+                    left: 8,
+                    right: 8,
                     child: _buildHeader(otherUserName, state, isVideo),
                   ),
 
@@ -142,17 +150,36 @@ class _CallPageState extends State<CallPage> {
     return Column(
       children: [
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.textSecondary),
-            const SizedBox(width: 4),
-            Text(
-              'End-to-end encrypted',
-              style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 30),
+              tooltip: 'Minimize call',
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Text(
+                  'End-to-end encrypted',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 22),
+              tooltip: 'Picture in Picture',
+              onPressed: () => PipService.enterPip(),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Text(
           name,
           style: AppTextStyles.heading1.copyWith(

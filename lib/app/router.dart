@@ -13,6 +13,7 @@ import '../features/chat/domain/entities/chat_entity.dart';
 import '../features/chat/presentation/pages/chat_room_page.dart';
 import '../features/chat/presentation/pages/create_group_page.dart';
 import '../features/chat/presentation/pages/home_page.dart';
+import '../features/contacts/presentation/pages/contact_profile_page.dart';
 import '../features/contacts/presentation/pages/contacts_page.dart';
 import '../features/music/presentation/pages/full_music_player_page.dart';
 import '../features/music/presentation/pages/music_browse_page.dart';
@@ -143,6 +144,19 @@ final GoRouter appRouter = GoRouter(
         return IncomingCallPage(
           call: call,
           currentUserId: currentUserId,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/contact-profile',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        return ContactProfilePage(
+          userId: extra['userId'] ?? '',
+          displayName: extra['displayName'] ?? 'Contact',
+          photoUrl: extra['photoUrl'],
+          phoneNumber: extra['phoneNumber'] ?? '',
+          about: extra['about'] ?? 'Available',
         );
       },
     ),
