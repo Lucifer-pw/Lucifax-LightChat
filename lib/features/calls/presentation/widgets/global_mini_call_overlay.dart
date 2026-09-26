@@ -40,7 +40,9 @@ class _GlobalMiniCallOverlayState extends State<GlobalMiniCallOverlay> {
             callState.status == CallStatus.ringing;
 
         final currentRoute = appRouter.routerDelegate.currentConfiguration.uri.toString();
-        final isCallPageOpen = currentRoute.contains('/call') || currentRoute.contains('/incoming-call');
+        final isCallPageOpen = callState.isCallPageActive ||
+            currentRoute.contains('/call') ||
+            currentRoute.contains('/incoming-call');
 
         final showOverlay = isActive && !isCallPageOpen && callState.call != null;
 

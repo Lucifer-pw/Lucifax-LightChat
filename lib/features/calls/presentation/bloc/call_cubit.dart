@@ -38,6 +38,8 @@ class CallCubit extends Cubit<CallState> {
   Future<void> startCall({required CallEntity call}) async {
     try {
       PipService.setInCall(true);
+      _timer?.cancel();
+      _timer = null;
 
       // Detect available audio devices
       final availableRoutes = await AudioRouteService.getAvailableDevices();
@@ -50,6 +52,7 @@ class CallCubit extends Cubit<CallState> {
         status: CallStatus.connecting,
         call: call,
         isCaller: true,
+        duration: 0,
         isSpeakerOn: initialRoute == AudioOutputRoute.speaker,
         audioRoute: initialRoute,
         availableAudioRoutes: availableRoutes,
@@ -118,6 +121,8 @@ class CallCubit extends Cubit<CallState> {
   Future<void> acceptCall({required CallEntity call}) async {
     try {
       PipService.setInCall(true);
+      _timer?.cancel();
+      _timer = null;
 
       // Detect available audio devices
       final availableRoutes = await AudioRouteService.getAvailableDevices();
@@ -130,6 +135,7 @@ class CallCubit extends Cubit<CallState> {
         status: CallStatus.connecting,
         call: call,
         isCaller: false,
+        duration: 0,
         isSpeakerOn: initialRoute == AudioOutputRoute.speaker,
         audioRoute: initialRoute,
         availableAudioRoutes: availableRoutes,
@@ -317,6 +323,10 @@ class CallCubit extends Cubit<CallState> {
         duration: duration,
       );
     }
+  }
+
+  void setCallPageActive(bool isActive) {
+    emit(state.copyWith(isCallPageActive: isActive));
   }
 
   void _cleanUpResources() {

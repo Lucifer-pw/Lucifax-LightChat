@@ -42,6 +42,10 @@ class CallEntity extends Equatable {
   bool get isConnected => status == 'connected';
   bool get isEnded => status == 'ended' || status == 'rejected' || status == 'missed' || status == 'busy';
 
+  String getOtherUserId(String currentUserId) {
+    return currentUserId == callerId ? receiverId : callerId;
+  }
+
   String getOtherUserName(String currentUserId) {
     return currentUserId == callerId ? receiverName : callerName;
   }

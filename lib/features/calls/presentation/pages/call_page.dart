@@ -37,6 +37,7 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     _callCubit = getIt<CallCubit>();
+    _callCubit.setCallPageActive(true);
 
     final isSameCall = _callCubit.state.call?.callId == widget.call.callId;
     final isCallActive = _callCubit.state.status != CallStatus.initial &&
@@ -54,7 +55,7 @@ class _CallPageState extends State<CallPage> {
 
   @override
   void dispose() {
-    // Preserve _callCubit so call remains alive when minimized / navigating
+    _callCubit.setCallPageActive(false);
     super.dispose();
   }
 

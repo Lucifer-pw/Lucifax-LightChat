@@ -11,6 +11,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../music/presentation/widgets/global_mini_player.dart';
 import '../../../calls/presentation/bloc/incoming_call_cubit.dart';
+import '../../../calls/presentation/pages/calls_tab_page.dart';
 import '../../../status/presentation/bloc/status_bloc.dart';
 import '../../../status/presentation/bloc/status_event.dart';
 import '../../../status/presentation/pages/status_tab_page.dart';
@@ -35,7 +36,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _privateChatBloc = getIt<ChatListBloc>();
     _groupChatBloc = getIt<ChatListBloc>();
 
@@ -186,6 +190,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             Tab(text: 'CHATS'),
             Tab(text: 'STATUS'),
             Tab(text: 'GROUPS'),
+            Tab(text: 'CALLS'),
           ],
         ),
       ),
@@ -203,6 +208,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
                 // Tab 3: Group Chats
                 _buildChatListView(_groupChatBloc, currentUserId, isGroup: true),
+
+                // Tab 4: Calls History
+                const CallsTabPage(),
               ],
             ),
           ),
@@ -216,11 +224,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               onPressed: () {
                 if (_tabController.index == 2) {
                   context.push('/create-group');
+                } else if (_tabController.index == 3) {
+                  context.push('/contacts');
                 } else {
                   context.push('/contacts');
                 }
               },
-              child: Icon(_tabController.index == 2 ? Icons.group_add_rounded : Icons.chat_bubble_rounded),
+              child: Icon(
+                _tabController.index == 2
+                    ? Icons.group_add_rounded
+                    : (_tabController.index == 3
+                        ? Icons.add_call
+                        : Icons.chat_bubble_rounded),
+              ),
             ),
     );
   }

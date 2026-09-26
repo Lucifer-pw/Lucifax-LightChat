@@ -26,6 +26,7 @@ class CallState extends Equatable {
   final int duration;
   final String? errorMessage;
   final bool isRemoteVideoActive;
+  final bool isCallPageActive;
 
   const CallState({
     this.status = CallStatus.initial,
@@ -41,6 +42,7 @@ class CallState extends Equatable {
     this.duration = 0,
     this.errorMessage,
     this.isRemoteVideoActive = false,
+    this.isCallPageActive = false,
   });
 
   CallState copyWith({
@@ -57,6 +59,7 @@ class CallState extends Equatable {
     int? duration,
     String? errorMessage,
     bool? isRemoteVideoActive,
+    bool? isCallPageActive,
   }) {
     return CallState(
       status: status ?? this.status,
@@ -72,6 +75,7 @@ class CallState extends Equatable {
       duration: duration ?? this.duration,
       errorMessage: errorMessage ?? this.errorMessage,
       isRemoteVideoActive: isRemoteVideoActive ?? this.isRemoteVideoActive,
+      isCallPageActive: isCallPageActive ?? this.isCallPageActive,
     );
   }
 
@@ -90,6 +94,7 @@ class CallState extends Equatable {
         duration,
         errorMessage,
         isRemoteVideoActive,
+        isCallPageActive,
       ];
 }
 
