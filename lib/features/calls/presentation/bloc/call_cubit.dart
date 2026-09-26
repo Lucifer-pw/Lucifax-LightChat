@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import '../../data/services/audio_route_service.dart';
 import '../../data/services/pip_service.dart';
 import '../../data/services/webrtc_service.dart';
 import '../../domain/entities/call_entity.dart';
@@ -37,11 +38,21 @@ class CallCubit extends Cubit<CallState> {
   Future<void> startCall({required CallEntity call}) async {
     try {
       PipService.setInCall(true);
+
+      // Detect available audio devices
+      final availableRoutes = await AudioRouteService.getAvailableDevices();
+      final hasBluetooth = availableRoutes.contains(AudioOutputRoute.bluetooth);
+      final initialRoute = call.isVideo
+          ? AudioOutputRoute.speaker
+          : (hasBluetooth ? AudioOutputRoute.bluetooth : AudioOutputRoute.earpiece);
+
       emit(state.copyWith(
         status: CallStatus.connecting,
         call: call,
         isCaller: true,
-        isSpeakerOn: call.isVideo,
+        isSpeakerOn: initialRoute == AudioOutputRoute.speaker,
+        audioRoute: initialRoute,
+        availableAudioRoutes: availableRoutes,
       ));
 
       // 1. Hook up callbacks FIRST before creating offer / peer connection
@@ -70,7 +81,7 @@ class CallCubit extends Cubit<CallState> {
 
       // 2. Initialize local camera / mic
       await webrtcService.openUserMedia(isVideo: call.isVideo);
-      await webrtcService.setSpeakerphone(call.isVideo);
+      await AudioRouteService.setAudioRoute(initialRoute);
 
       // 3. Create WebRTC Offer (this triggers local ICE candidate gathering)
       final offer = await webrtcService.createOffer(isVideo: call.isVideo);
@@ -107,11 +118,21 @@ class CallCubit extends Cubit<CallState> {
   Future<void> acceptCall({required CallEntity call}) async {
     try {
       PipService.setInCall(true);
+
+      // Detect available audio devices
+      final availableRoutes = await AudioRouteService.getAvailableDevices();
+      final hasBluetooth = availableRoutes.contains(AudioOutputRoute.bluetooth);
+      final initialRoute = call.isVideo
+          ? AudioOutputRoute.speaker
+          : (hasBluetooth ? AudioOutputRoute.bluetooth : AudioOutputRoute.earpiece);
+
       emit(state.copyWith(
         status: CallStatus.connecting,
         call: call,
         isCaller: false,
-        isSpeakerOn: call.isVideo,
+        isSpeakerOn: initialRoute == AudioOutputRoute.speaker,
+        audioRoute: initialRoute,
+        availableAudioRoutes: availableRoutes,
       ));
 
       // 1. Hook up callbacks FIRST before creating answer
@@ -138,7 +159,7 @@ class CallCubit extends Cubit<CallState> {
 
       // 2. Initialize local camera / mic
       await webrtcService.openUserMedia(isVideo: call.isVideo);
-      await webrtcService.setSpeakerphone(call.isVideo);
+      await AudioRouteService.setAudioRoute(initialRoute);
 
       // 3. Create peer connection instance & set remote offer
       await webrtcService.createPeerConnectionInstance(isVideo: call.isVideo);
@@ -260,10 +281,26 @@ class CallCubit extends Cubit<CallState> {
     emit(state.copyWith(isFrontCamera: !state.isFrontCamera));
   }
 
+  Future<void> setAudioRoute(AudioOutputRoute route) async {
+    await AudioRouteService.setAudioRoute(route);
+    emit(state.copyWith(
+      audioRoute: route,
+      isSpeakerOn: route == AudioOutputRoute.speaker,
+    ));
+  }
+
+  Future<void> refreshAudioDevices() async {
+    final devices = await AudioRouteService.getAvailableDevices();
+    emit(state.copyWith(availableAudioRoutes: devices));
+  }
+
   Future<void> toggleSpeakerphone() async {
-    final nextState = !state.isSpeakerOn;
-    await webrtcService.setSpeakerphone(nextState);
-    emit(state.copyWith(isSpeakerOn: nextState));
+    final nextRoute = state.audioRoute == AudioOutputRoute.speaker
+        ? (state.availableAudioRoutes.contains(AudioOutputRoute.bluetooth)
+            ? AudioOutputRoute.bluetooth
+            : AudioOutputRoute.earpiece)
+        : AudioOutputRoute.speaker;
+    await setAudioRoute(nextRoute);
   }
 
   Future<void> endCall({String status = 'ended'}) async {

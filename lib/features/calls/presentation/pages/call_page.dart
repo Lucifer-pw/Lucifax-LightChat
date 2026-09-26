@@ -6,10 +6,13 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../data/services/audio_route_service.dart';
 import '../../data/services/pip_service.dart';
 import '../../domain/entities/call_entity.dart';
 import '../bloc/call_cubit.dart';
 import '../bloc/call_state.dart';
+import '../widgets/audio_route_selector_dialog.dart';
+import '../widgets/whatsapp_call_background.dart';
 
 class CallPage extends StatefulWidget {
   final CallEntity call;
@@ -58,9 +61,9 @@ class _CallPageState extends State<CallPage> {
   String _formatDuration(int seconds) {
     final mins = seconds ~/ 60;
     final remainingSecs = seconds % 60;
-    final minStr = mins.toString().padLeft(2, '0');
+    final minStr = mins.toString();
     final secStr = remainingSecs.toString().padLeft(2, '0');
-    return '$minStr:$secStr';
+    return '$minStr.$secStr';
   }
 
   String _getStatusText(CallState state) {
@@ -79,6 +82,69 @@ class _CallPageState extends State<CallPage> {
         return state.errorMessage ?? 'Call failed';
       case CallStatus.initial:
         return '';
+    }
+  }
+
+  void _showAudioRouteDialog(CallState state) {
+    AudioRouteSelectorDialog.show(
+      context,
+      currentRoute: state.audioRoute,
+      availableRoutes: state.availableAudioRoutes,
+      onRouteSelected: (route) {
+        _callCubit.setAudioRoute(route);
+      },
+    );
+  }
+
+  void _showMoreMenu(CallState state, bool isVideo) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF182229),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.flip_camera_ios_rounded, color: Colors.white),
+                title: const Text('Switch camera', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _callCubit.switchCamera();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white),
+                title: const Text('Picture in Picture', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  PipService.enterPip();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.speaker_group_rounded, color: Colors.white),
+                title: const Text('Audio output', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showAudioRouteDialog(state);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _minimizeCall() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      PipService.enterPip();
     }
   }
 
@@ -102,25 +168,27 @@ class _CallPageState extends State<CallPage> {
         },
         builder: (context, state) {
           return Scaffold(
-            backgroundColor: AppColors.background,
+            backgroundColor: const Color(0xFF0C161C),
             body: SafeArea(
               child: Stack(
                 children: [
-                  // 1. Background / Video Content
+                  // 1. Background (WhatsApp Doodle Pattern or RTC Video View)
                   if (isVideo && state.status == CallStatus.connected)
                     _buildVideoView(state)
                   else
-                    _buildVoiceView(otherUserName, otherUserPhoto, state),
+                    WhatsAppCallBackground(
+                      child: _buildVoiceView(otherUserName, otherUserPhoto, state),
+                    ),
 
-                  // 2. Top Header (Name, Status, Encryption badge, Minimize / PiP buttons)
+                  // 2. Top Header Bar (Minimize, Name, Duration, Add Participant)
                   Positioned(
-                    top: 8,
-                    left: 8,
-                    right: 8,
-                    child: _buildHeader(otherUserName, state, isVideo),
+                    top: 12,
+                    left: 16,
+                    right: 16,
+                    child: _buildHeader(otherUserName, state),
                   ),
 
-                  // 3. Local Camera Preview (PiP for Video Call)
+                  // 3. Local Camera Preview (PiP overlay for Video Call)
                   if (isVideo && !state.isVideoOff && state.status != CallStatus.ended)
                     Positioned(
                       top: 80,
@@ -130,12 +198,12 @@ class _CallPageState extends State<CallPage> {
                       child: _buildLocalVideoPreview(),
                     ),
 
-                  // 4. Bottom Controls Bar
+                  // 4. Bottom WhatsApp Control Sheet (2 Rows x 3 Columns)
                   Positioned(
-                    bottom: 32,
-                    left: 16,
-                    right: 16,
-                    child: _buildControlButtons(state, isVideo),
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: _buildBottomControlSheet(state, isVideo),
                   ),
                 ],
               ),
@@ -146,55 +214,82 @@ class _CallPageState extends State<CallPage> {
     );
   }
 
-  Widget _buildHeader(String name, CallState state, bool isVideo) {
-    return Column(
+  Widget _buildHeader(String name, CallState state) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 30),
-              tooltip: 'Minimize call',
-              onPressed: () {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
-                }
-              },
+        // Left: Minimize / Collapse button
+        InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: _minimizeCall,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
+              shape: BoxShape.circle,
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Text(
-                  'End-to-end encrypted',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
-                ),
-              ],
+            child: const Icon(
+              Icons.close_fullscreen_rounded,
+              color: Colors.white,
+              size: 22,
             ),
-            IconButton(
-              icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 22),
-              tooltip: 'Picture in Picture',
-              onPressed: () => PipService.enterPip(),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          name,
-          style: AppTextStyles.heading1.copyWith(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
           ),
-          textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 4),
-        Text(
-          _getStatusText(state),
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: state.status == CallStatus.connected ? AppColors.primary : AppColors.textSecondary,
-            fontWeight: state.status == CallStatus.connected ? FontWeight.bold : FontWeight.normal,
+
+        // Center: Contact Name & Status/Duration
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _getStatusText(state),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: state.status == CallStatus.connected
+                      ? Colors.white70
+                      : AppColors.textSecondary,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Right: Add Participant / Group Call button
+        InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Group calling feature coming soon!'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Colors.transparent,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.person_add_alt_1_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
         ),
       ],
@@ -206,25 +301,34 @@ class _CallPageState extends State<CallPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Circular Avatar with Atmospheric Glowing Ring
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFF1D5A75).withOpacity(0.5),
+                  const Color(0xFF0F3142).withOpacity(0.2),
+                  Colors.transparent,
+                ],
+                stops: const [0.5, 0.8, 1.0],
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: (state.status == CallStatus.connected ? AppColors.primary : AppColors.surfaceLight)
-                      .withOpacity(0.2),
-                  spreadRadius: 20,
-                  blurRadius: 40,
+                  color: const Color(0xFF15485E).withOpacity(0.35),
+                  blurRadius: 50,
+                  spreadRadius: 25,
                 ),
               ],
             ),
             child: CustomAvatar(
               imageUrl: photo,
               name: name,
-              radius: 65,
+              radius: 72,
             ),
           ),
+          const SizedBox(height: 80),
         ],
       ),
     );
@@ -238,7 +342,7 @@ class _CallPageState extends State<CallPage> {
               objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
             )
           : Container(
-              color: AppColors.surface,
+              color: const Color(0xFF0C161C),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -278,96 +382,173 @@ class _CallPageState extends State<CallPage> {
     );
   }
 
-  Widget _buildControlButtons(CallState state, bool isVideo) {
+  Widget _buildBottomControlSheet(CallState state, bool isVideo) {
     final isEnded = state.status == CallStatus.ended;
 
+    // Determine Audio Button Icon & Active Status
+    IconData audioIcon = Icons.volume_up_rounded;
+    bool isAudioActive = false;
+
+    if (state.audioRoute == AudioOutputRoute.bluetooth) {
+      audioIcon = Icons.bluetooth_rounded;
+      isAudioActive = true;
+    } else if (state.audioRoute == AudioOutputRoute.speaker) {
+      audioIcon = Icons.volume_up_rounded;
+      isAudioActive = true;
+    } else {
+      audioIcon = Icons.phone_android_rounded;
+      isAudioActive = false;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.85),
-        borderRadius: BorderRadius.circular(AppSizes.r24),
-        boxShadow: const [
+      padding: const EdgeInsets.only(top: 24, bottom: 28, left: 24, right: 24),
+      decoration: const BoxDecoration(
+        color: Color(0xFF101D24),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black26,
-            blurRadius: 16,
+            color: Colors.black87,
+            blurRadius: 24,
+            offset: Offset(0, -4),
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Speakerphone Button
-          _buildCircleButton(
-            icon: state.isSpeakerOn ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-            isActive: state.isSpeakerOn,
-            onTap: isEnded ? null : () => _callCubit.toggleSpeakerphone(),
-          ),
-
-          // Microphone Mute Button
-          _buildCircleButton(
-            icon: state.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-            isActive: !state.isMuted,
-            onTap: isEnded ? null : () => _callCubit.toggleMicrophone(),
-          ),
-
-          // Video On/Off Button (for video call)
-          if (isVideo) ...[
-            _buildCircleButton(
-              icon: state.isVideoOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
-              isActive: !state.isVideoOff,
-              onTap: isEnded ? null : () => _callCubit.toggleVideo(),
-            ),
-            // Switch Camera Button
-            _buildCircleButton(
-              icon: Icons.flip_camera_ios_rounded,
-              isActive: true,
-              onTap: isEnded ? null : () => _callCubit.switchCamera(),
-            ),
-          ],
-
-          // End Call Button (Red)
-          Material(
-            color: AppColors.error,
-            shape: const CircleBorder(),
-            elevation: 4,
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: isEnded ? null : () => _callCubit.endCall(),
-              child: const Padding(
-                padding: EdgeInsets.all(16),
-                child: Icon(
-                  Icons.call_end_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
+          // Row 1: Audio | Video | Bisukan
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildActionButton(
+                icon: audioIcon,
+                label: 'Audio',
+                isActive: isAudioActive,
+                onTap: isEnded ? null : () => _showAudioRouteDialog(state),
               ),
-            ),
+              _buildActionButton(
+                icon: state.isVideoOff ? Icons.videocam_off_rounded : Icons.videocam_rounded,
+                label: 'Video',
+                isActive: isVideo && !state.isVideoOff,
+                onTap: isEnded ? null : () => _callCubit.toggleVideo(),
+              ),
+              _buildActionButton(
+                icon: state.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                label: 'Bisukan',
+                isActive: state.isMuted,
+                onTap: isEnded ? null : () => _callCubit.toggleMicrophone(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Row 2: Lainnya | Bagikan | Akhiri
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildActionButton(
+                icon: Icons.more_horiz_rounded,
+                label: 'Lainnya',
+                isActive: false,
+                onTap: isEnded ? null : () => _showMoreMenu(state, isVideo),
+              ),
+              _buildActionButton(
+                icon: Icons.file_upload_outlined,
+                label: 'Bagikan',
+                isActive: state.isScreenSharing,
+                onTap: isEnded
+                    ? null
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Screen sharing feature ready for conference update!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+              ),
+              _buildEndCallButton(isEnded),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCircleButton({
+  Widget _buildActionButton({
     required IconData icon,
+    required String label,
     required bool isActive,
     required VoidCallback? onTap,
   }) {
-    return Material(
-      color: isActive ? AppColors.surfaceLight : Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Icon(
-            icon,
-            color: isActive ? Colors.white : AppColors.textMuted,
-            size: 24,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: isActive ? Colors.white : const Color(0xFF222E35),
+          shape: const CircleBorder(),
+          elevation: isActive ? 4 : 0,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: Container(
+              width: 58,
+              height: 58,
+              alignment: Alignment.center,
+              child: Icon(
+                icon,
+                color: isActive ? Colors.black : Colors.white,
+                size: 26,
+              ),
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEndCallButton(bool isEnded) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: const Color(0xFFEA0038),
+          shape: const CircleBorder(),
+          elevation: 6,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: isEnded ? null : () => _callCubit.endCall(),
+            child: Container(
+              width: 58,
+              height: 58,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.call_end_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Akhiri',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../data/services/audio_route_service.dart';
 import '../../domain/entities/call_entity.dart';
 
 enum CallStatus {
@@ -19,6 +20,9 @@ class CallState extends Equatable {
   final bool isVideoOff;
   final bool isFrontCamera;
   final bool isSpeakerOn;
+  final AudioOutputRoute audioRoute;
+  final List<AudioOutputRoute> availableAudioRoutes;
+  final bool isScreenSharing;
   final int duration;
   final String? errorMessage;
   final bool isRemoteVideoActive;
@@ -31,6 +35,9 @@ class CallState extends Equatable {
     this.isVideoOff = false,
     this.isFrontCamera = true,
     this.isSpeakerOn = false,
+    this.audioRoute = AudioOutputRoute.earpiece,
+    this.availableAudioRoutes = const [AudioOutputRoute.speaker, AudioOutputRoute.earpiece],
+    this.isScreenSharing = false,
     this.duration = 0,
     this.errorMessage,
     this.isRemoteVideoActive = false,
@@ -44,6 +51,9 @@ class CallState extends Equatable {
     bool? isVideoOff,
     bool? isFrontCamera,
     bool? isSpeakerOn,
+    AudioOutputRoute? audioRoute,
+    List<AudioOutputRoute>? availableAudioRoutes,
+    bool? isScreenSharing,
     int? duration,
     String? errorMessage,
     bool? isRemoteVideoActive,
@@ -55,7 +65,10 @@ class CallState extends Equatable {
       isMuted: isMuted ?? this.isMuted,
       isVideoOff: isVideoOff ?? this.isVideoOff,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
-      isSpeakerOn: isSpeakerOn ?? this.isSpeakerOn,
+      isSpeakerOn: isSpeakerOn ?? (audioRoute != null ? audioRoute == AudioOutputRoute.speaker : this.isSpeakerOn),
+      audioRoute: audioRoute ?? this.audioRoute,
+      availableAudioRoutes: availableAudioRoutes ?? this.availableAudioRoutes,
+      isScreenSharing: isScreenSharing ?? this.isScreenSharing,
       duration: duration ?? this.duration,
       errorMessage: errorMessage ?? this.errorMessage,
       isRemoteVideoActive: isRemoteVideoActive ?? this.isRemoteVideoActive,
@@ -71,8 +84,12 @@ class CallState extends Equatable {
         isVideoOff,
         isFrontCamera,
         isSpeakerOn,
+        audioRoute,
+        availableAudioRoutes,
+        isScreenSharing,
         duration,
         errorMessage,
         isRemoteVideoActive,
       ];
 }
+
