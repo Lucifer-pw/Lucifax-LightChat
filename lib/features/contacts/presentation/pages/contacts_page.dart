@@ -81,6 +81,7 @@ class _ContactsPageState extends State<ContactsPage> {
     try {
       await FlutterContacts.openExternalInsert();
     } catch (_) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open contact editor')),
       );

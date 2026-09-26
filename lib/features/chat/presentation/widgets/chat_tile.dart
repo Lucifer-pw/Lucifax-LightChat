@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../../app/router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
+import '../../../../core/constants/firebase_constants.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../core/widgets/custom_avatar.dart';
@@ -22,9 +24,71 @@ class ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = chat.getDisplayName(currentUserId);
-    final photoUrl = chat.getDisplayPhoto(currentUserId);
-    final isOnline = chat.isOtherUserOnline(currentUserId);
+    if (!chat.isGroup) {
+      final otherUserId = chat.getOtherUserId(currentUserId);
+      if (otherUserId.isNotEmpty) {
+        return StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection(FirebaseConstants.usersCollection)
+              .doc(otherUserId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            String displayName = chat.getDisplayName(currentUserId);
+            String? photoUrl = chat.getDisplayPhoto(currentUserId);
+            bool isOnline = chat.isOtherUserOnline(currentUserId);
+            String phoneNumber = '';
+            String about = 'Available';
+
+            if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
+              final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+              final liveName = data['displayName'] as String?;
+              if (liveName != null && liveName.trim().isNotEmpty) {
+                displayName = liveName;
+              }
+              final livePhoto = data['photoUrl'] as String?;
+              if (livePhoto != null && livePhoto.isNotEmpty) {
+                photoUrl = livePhoto;
+              }
+              isOnline = data['isOnline'] == true;
+              phoneNumber = data['phoneNumber'] ?? '';
+              about = data['about'] ?? data['bio'] ?? 'Available';
+            }
+
+            return _buildTile(
+              context: context,
+              displayName: displayName,
+              photoUrl: photoUrl,
+              isOnline: isOnline,
+              otherUserId: otherUserId,
+              phoneNumber: phoneNumber,
+              about: about,
+            );
+          },
+        );
+      }
+    }
+
+    // Fallback for group chats or when otherUserId is empty
+    return _buildTile(
+      context: context,
+      displayName: chat.getDisplayName(currentUserId),
+      photoUrl: chat.getDisplayPhoto(currentUserId),
+      isOnline: false,
+      otherUserId: '',
+      phoneNumber: '',
+      about: '',
+    );
+  }
+
+  Widget _buildTile({
+    required BuildContext context,
+    required String displayName,
+    required String? photoUrl,
+    required bool isOnline,
+    required String otherUserId,
+    required String phoneNumber,
+    required String about,
+  }) {
     final unreadCount = chat.getUnreadCount(currentUserId);
     final lastMessage = chat.lastMessage;
 
@@ -51,17 +115,14 @@ class ChatTile extends StatelessWidget {
               isOnline: isOnline,
               showOnlineBadge: !chat.isGroup,
               onTap: () {
-                if (!chat.isGroup) {
-                  final otherUserId = chat.getOtherUserId(currentUserId);
-                  if (otherUserId.isNotEmpty) {
-                    appRouter.push('/contact-profile', extra: {
-                      'userId': otherUserId,
-                      'displayName': displayName,
-                      'photoUrl': photoUrl,
-                      'phoneNumber': '',
-                      'about': 'Available',
-                    });
-                  }
+                if (!chat.isGroup && otherUserId.isNotEmpty) {
+                  appRouter.push('/contact-profile', extra: {
+                    'userId': otherUserId,
+                    'displayName': displayName,
+                    'photoUrl': photoUrl,
+                    'phoneNumber': phoneNumber,
+                    'about': about,
+                  });
                 }
               },
             ),

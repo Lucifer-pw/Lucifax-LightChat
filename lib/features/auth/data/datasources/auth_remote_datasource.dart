@@ -213,6 +213,27 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           .doc(user.uid)
           .set(updateData, SetOptions(merge: true));
 
+      // ── Sync participantDetails in all chats this user belongs to ──
+      try {
+        final chatQuery = await _firestore
+            .collection(FirebaseConstants.chatsCollection)
+            .where('participants', arrayContains: user.uid)
+            .get();
+
+        if (chatQuery.docs.isNotEmpty) {
+          final batch = _firestore.batch();
+          for (final doc in chatQuery.docs) {
+            batch.update(doc.reference, {
+              'participantDetails.${user.uid}.name': displayName,
+              if (photoUrl != null) 'participantDetails.${user.uid}.photoUrl': photoUrl,
+            });
+          }
+          await batch.commit();
+        }
+      } catch (_) {
+        // Best-effort: don't fail profile save if chat sync fails
+      }
+
       final updatedDoc = await _firestore
           .collection(FirebaseConstants.usersCollection)
           .doc(user.uid)

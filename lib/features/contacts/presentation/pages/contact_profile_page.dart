@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -49,6 +51,34 @@ class _ContactProfilePageState extends State<ContactProfilePage> {
     _livePhone = widget.phoneNumber;
   }
 
+  Widget _buildFullScreenImage(String? url, String name) {
+    if (url == null || url.isEmpty) {
+      return _buildPlaceholderPhoto(name, size: 200);
+    }
+    if (url.startsWith('data:image')) {
+      try {
+        final base64String = url.split(',').last;
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _buildPlaceholderPhoto(name, size: 200),
+        );
+      } catch (_) {
+        return _buildPlaceholderPhoto(name, size: 200);
+      }
+    } else {
+      return CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.contain,
+        placeholder: (_, __) => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+        errorWidget: (_, __, ___) => _buildPlaceholderPhoto(name, size: 200),
+      );
+    }
+  }
+
   void _openFullScreenPhoto(String? url, String name) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -65,13 +95,7 @@ class _ContactProfilePageState extends State<ContactProfilePage> {
               boundaryMargin: const EdgeInsets.all(20),
               minScale: 0.5,
               maxScale: 4.0,
-              child: url != null && url.isNotEmpty
-                  ? Image.network(
-                      url,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => _buildPlaceholderPhoto(name, size: 200),
-                    )
-                  : _buildPlaceholderPhoto(name, size: 200),
+              child: _buildFullScreenImage(url, name),
             ),
           ),
         ),

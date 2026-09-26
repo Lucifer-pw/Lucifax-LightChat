@@ -49,6 +49,7 @@ class _AvatarCropperPageState extends State<AvatarCropperPage> {
       final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData == null) {
+        if (!mounted) return;
         Navigator.pop(context, widget.imageFile);
         return;
       }
@@ -58,9 +59,8 @@ class _AvatarCropperPageState extends State<AvatarCropperPage> {
       final croppedFile = File('${tempDir.path}/cropped_avatar_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await croppedFile.writeAsBytes(buffer);
 
-      if (mounted) {
-        Navigator.pop(context, croppedFile);
-      }
+      if (!mounted) return;
+      Navigator.pop(context, croppedFile);
     } catch (e) {
       debugPrint('[AvatarCropper] Error cropping image: $e');
       if (mounted) {

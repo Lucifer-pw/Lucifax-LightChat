@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -140,6 +141,25 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildFullScreenImage(String photoUrl) {
+    if (photoUrl.startsWith('data:image')) {
+      try {
+        final base64Str = photoUrl.split(',').last;
+        final bytes = base64Decode(base64Str);
+        return Image.memory(bytes, fit: BoxFit.contain);
+      } catch (_) {
+        return const Icon(Icons.broken_image_rounded, size: 80, color: Colors.grey);
+      }
+    }
+    return Image.network(
+      photoUrl,
+      fit: BoxFit.contain,
+      loadingBuilder: (c, child, progress) =>
+          progress == null ? child : const CircularProgressIndicator(color: AppColors.primary),
+      errorBuilder: (c, e, s) => const Icon(Icons.broken_image_rounded, size: 80, color: Colors.grey),
+    );
+  }
+
   void _showFullScreenAvatar(String photoUrl, String name) {
     showDialog(
       context: context,
@@ -157,13 +177,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             ClipRRect(
               borderRadius: BorderRadius.circular(AppSizes.r16),
-              child: Image.network(
-                photoUrl,
-                fit: BoxFit.contain,
-                loadingBuilder: (c, child, progress) =>
-                    progress == null ? child : const CircularProgressIndicator(color: AppColors.primary),
-                errorBuilder: (c, e, s) => const Icon(Icons.broken_image_rounded, size: 80, color: Colors.grey),
-              ),
+              child: _buildFullScreenImage(photoUrl),
             ),
             const SizedBox(height: 12),
             Text(name, style: AppTextStyles.heading2),
