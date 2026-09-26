@@ -1,7 +1,7 @@
 name: lucifax_lightchat
 description: "Lucifax LightChat - WhatsApp-like Hybrid Messaging Application"
 publish_to: 'none'
-version: 1.0.16+16
+version: 1.0.17+17
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

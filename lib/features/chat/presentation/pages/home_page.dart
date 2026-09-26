@@ -117,62 +117,98 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.camera_alt_outlined),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Buka kamera untuk membuat status/foto...')),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.search_rounded),
             onPressed: () {},
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),
-            color: AppColors.surface,
+            color: const Color(0xFF1F2C34),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             onSelected: (value) {
               if (value == 'new_group') {
                 context.push('/create-group');
-              } else if (value == 'music_lounge') {
-                context.push('/music-browse');
-              } else if (value == 'profile') {
-                context.push('/profile');
-              } else if (value == 'settings') {
-                context.push('/appearance-settings');
-              } else if (value == 'qr_web') {
+              } else if (value == 'new_community') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Fitur Komunitas akan segera hadir!')),
+                );
+              } else if (value == 'broadcast_list') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Fitur Daftar Siaran akan segera hadir!')),
+                );
+              } else if (value == 'linked_devices') {
                 context.push('/qr-scanner');
-              } else if (value == 'check_update') {
-                _checkAppUpdate(auto: false);
+              } else if (value == 'starred_messages') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Belum ada pesan berbintang')),
+                );
+              } else if (value == 'read_all') {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Semua obrolan ditandai telah dibaca')),
+                );
+              } else if (value == 'settings') {
+                context.push('/profile');
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'new_group',
-                child: Text('New Group'),
+                child: Text('Grup baru', style: TextStyle(color: Colors.white, fontSize: 15)),
               ),
               const PopupMenuItem(
-                value: 'music_lounge',
+                value: 'new_community',
+                child: Text('Komunitas baru', style: TextStyle(color: Colors.white, fontSize: 15)),
+              ),
+              const PopupMenuItem(
+                value: 'broadcast_list',
+                child: Text('Daftar siaran', style: TextStyle(color: Colors.white, fontSize: 15)),
+              ),
+              PopupMenuItem(
+                value: 'linked_devices',
                 child: Row(
                   children: [
-                    Icon(Icons.music_note_rounded, size: 18, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text('Music Lounge'),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: const BoxDecoration(
+                        color: Colors.amber,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const Text('Perangkat tertaut', style: TextStyle(color: Colors.white, fontSize: 15)),
                   ],
                 ),
               ),
               const PopupMenuItem(
-                value: 'qr_web',
-                child: Text('Linked Devices (LightChatWeb)'),
+                value: 'starred_messages',
+                child: Text('Berbintang', style: TextStyle(color: Colors.white, fontSize: 15)),
               ),
               const PopupMenuItem(
-                value: 'profile',
-                child: Text('Profile'),
+                value: 'read_all',
+                child: Text('Baca semua', style: TextStyle(color: Colors.white, fontSize: 15)),
               ),
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'settings',
-                child: Text('Appearance & Settings'),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'check_update',
                 child: Row(
                   children: [
-                    Icon(Icons.system_update_rounded, size: 18, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text('Check for Updates'),
+                    const Text('Pengaturan', style: TextStyle(color: Colors.white, fontSize: 15)),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF25D366),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -5,17 +5,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'avatar_cropper_page.dart';
-
+import '../../../../app/di/injection.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/text_styles.dart';
-import '../../../../core/utils/phone_number_formatter.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../../app_update/domain/usecases/check_for_update.dart';
+import '../../../app_update/presentation/widgets/update_dialog.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import 'avatar_cropper_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -29,16 +30,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isSaving = false;
   UserEntity? _cachedUser;
 
-  final List<String> _presetBios = [
-    "Hey! I'm using LightChat",
-    '⚡ Available',
-    '🎵 Listening to Music',
-    '💻 At work / Coding',
-    '☕ Coffee break',
-    '🌙 Sleeping',
-    '🔕 Busy',
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -51,7 +42,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // ----------------------------------------------------
-  // CRUD Methods
+  // Image & Profile Methods
   // ----------------------------------------------------
 
   Future<void> _pickAvatar(ImageSource source) async {
@@ -64,7 +55,6 @@ class _ProfilePageState extends State<ProfilePage> {
       );
 
       if (pickedFile != null && mounted) {
-        // Open WhatsApp-style Avatar Cropper
         final croppedFile = await Navigator.push<File?>(
           context,
           MaterialPageRoute(
@@ -95,7 +85,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void _showAvatarOptions(String? currentPhotoUrl, String name) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surface,
+      backgroundColor: const Color(0xFF1F2C34),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -187,12 +177,14 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showEditNameDialog(String currentName, String currentBio) {
-    final controller = TextEditingController(text: currentName);
+  void _showEditProfileDialog(String currentName, String currentBio) {
+    final nameCtrl = TextEditingController(text: currentName);
+    final bioCtrl = TextEditingController(text: currentBio);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: const Color(0xFF1F2C34),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -207,36 +199,34 @@ class _ProfilePageState extends State<ProfilePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Masukkan Nama Anda', style: AppTextStyles.heading3.copyWith(fontSize: 18)),
-            const SizedBox(height: 8),
-            Text(
-              'Ini bukan nama pengguna atau PIN. Nama ini akan terlihat oleh kontak Anda.',
-              style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
-            ),
+            Text('Edit Profil', style: AppTextStyles.heading3.copyWith(fontSize: 18)),
             const SizedBox(height: 16),
             TextField(
-              controller: controller,
+              controller: nameCtrl,
               maxLength: 30,
-              autofocus: true,
               style: const TextStyle(color: Colors.white, fontSize: 16),
               decoration: InputDecoration(
+                labelText: 'Nama',
+                labelStyle: const TextStyle(color: AppColors.primary),
                 filled: true,
                 fillColor: AppColors.surfaceLight,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.r12),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.r12),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                ),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.clear_rounded, color: AppColors.textSecondary),
-                  onPressed: () => controller.clear(),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
             const SizedBox(height: 12),
+            TextField(
+              controller: bioCtrl,
+              maxLength: 80,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              decoration: InputDecoration(
+                labelText: 'Info / Status',
+                labelStyle: const TextStyle(color: AppColors.primary),
+                filled: true,
+                fillColor: AppColors.surfaceLight,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -247,14 +237,15 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () {
-                    final newName = controller.text.trim();
+                    final newName = nameCtrl.text.trim();
+                    final newBio = bioCtrl.text.trim();
                     if (newName.isNotEmpty) {
                       Navigator.pop(ctx);
                       setState(() => _isSaving = true);
                       context.read<AuthBloc>().add(
                             SaveProfileEvent(
                               displayName: newName,
-                              bio: currentBio,
+                              bio: newBio,
                             ),
                           );
                     }
@@ -273,137 +264,50 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showEditBioDialog(String currentName, String currentBio) {
-    final controller = TextEditingController(text: currentBio);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            left: AppSizes.p20,
-            right: AppSizes.p20,
-            top: AppSizes.p20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Ubah Status / Info', style: AppTextStyles.heading3.copyWith(fontSize: 18)),
-              const SizedBox(height: 14),
-              TextField(
-                controller: controller,
-                maxLength: 80,
-                maxLines: 2,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Tulis status Anda...',
-                  hintStyle: const TextStyle(color: AppColors.textMuted),
-                  filled: true,
-                  fillColor: AppColors.surfaceLight,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSizes.r12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSizes.r12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                  ),
-                ),
+  Future<void> _checkAppUpdate() async {
+    try {
+      final checkUpdate = getIt<CheckForUpdate>();
+      final result = await checkUpdate();
+
+      if (!mounted) return;
+
+      result.fold(
+        (failure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(failure.message), backgroundColor: AppColors.error),
+          );
+        },
+        (updateInfo) {
+          if (updateInfo.hasUpdate) {
+            UpdateDialog.show(context, updateInfo);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Anda menggunakan versi terbaru (v${updateInfo.currentVersion}) 👍'),
+                backgroundColor: AppColors.success,
               ),
-              const SizedBox(height: 8),
-              Text('PILIH STATUS CEPAT', style: AppTextStyles.caption.copyWith(color: AppColors.primary)),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: _presetBios.map((preset) {
-                  final isSelected = controller.text == preset;
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(AppSizes.rFull),
-                    onTap: () {
-                      setModalState(() {
-                        controller.text = preset;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary.withOpacity(0.2) : AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(AppSizes.rFull),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.border,
-                        ),
-                      ),
-                      child: Text(
-                        preset,
-                        style: TextStyle(
-                          color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      final newBio = controller.text.trim();
-                      if (newBio.isNotEmpty) {
-                        Navigator.pop(ctx);
-                        setState(() => _isSaving = true);
-                        context.read<AuthBloc>().add(
-                              SaveProfileEvent(
-                                displayName: currentName,
-                                bio: newBio,
-                              ),
-                            );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Simpan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+            );
+          }
+        },
+      );
+    } catch (_) {}
   }
 
   void _confirmLogout() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: const Color(0xFF1F2C34),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.r16)),
-        title: const Text('Log out?', style: TextStyle(color: Colors.white)),
+        title: const Text('Keluar dari LightChat?', style: TextStyle(color: Colors.white)),
         content: const Text(
-          'Are you sure you want to log out from LightChat?',
+          'Apakah Anda yakin ingin keluar dari akun ini?',
           style: TextStyle(color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -415,16 +319,30 @@ class _ProfilePageState extends State<ProfilePage> {
               backgroundColor: AppColors.error,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('Log Out', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('Keluar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  // ----------------------------------------------------
-  // Main UI
-  // ----------------------------------------------------
+  void _showFeatureInfo(String title, String description) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1F2C34),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(title, style: const TextStyle(color: Colors.white)),
+        content: Text(description, style: const TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Tutup', style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -448,194 +366,356 @@ class _ProfilePageState extends State<ProfilePage> {
         }
 
         if (_cachedUser == null) {
-          return Scaffold(
-            backgroundColor: AppColors.background,
-            appBar: AppBar(title: const Text('Profile')),
-            body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          return const Scaffold(
+            backgroundColor: Color(0xFF0C161C),
+            body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
           );
         }
 
         final user = _cachedUser!;
 
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: const Color(0xFF0C161C),
           appBar: AppBar(
-            title: const Text('Profile'),
+            backgroundColor: const Color(0xFF0C161C),
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.search_rounded, color: Colors.white),
+                onPressed: () {},
+              ),
+              IconButton(
+                icon: const Icon(Icons.qr_code_2_rounded, color: Colors.white),
+                onPressed: () => context.push('/qr-scanner'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                onPressed: () => _showEditProfileDialog(user.displayName, user.bio),
+              ),
+            ],
           ),
           body: SingleChildScrollView(
             child: Column(
               children: [
-                // Top Cover Banner + Avatar
-                Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      height: 140,
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.primaryDark,
-                            AppColors.surfaceLight,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                // Top Profile Banner: Speech Bubble + Avatar + Name
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    children: [
+                      // Speech bubble
+                      GestureDetector(
+                        onTap: () => _showEditProfileDialog(user.displayName, user.bio),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1F2C34),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            user.bio.isNotEmpty ? user.bio : 'Ada kabar apa?',
+                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                          ),
                         ),
                       ),
-                    ),
-                    Positioned(
-                      bottom: -45,
-                      child: Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          CustomAvatar(
-                            imageUrl: user.photoUrl,
-                            name: user.displayName,
-                            radius: 48,
-                            onTap: () => _showAvatarOptions(user.photoUrl, user.displayName),
-                          ),
-                          // Camera Edit Badge
-                          Material(
-                            color: AppColors.primary,
-                            shape: const CircleBorder(),
-                            elevation: 4,
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () => _showAvatarOptions(user.photoUrl, user.displayName),
-                              child: const Padding(
-                                padding: EdgeInsets.all(6),
-                                child: Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+                      const SizedBox(height: 12),
+
+                      // Avatar
+                      GestureDetector(
+                        onTap: () => _showAvatarOptions(user.photoUrl, user.displayName),
+                        child: CustomAvatar(
+                          imageUrl: user.photoUrl,
+                          name: user.displayName,
+                          radius: 54,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Name + Chevron
+                      GestureDetector(
+                        onTap: () => _showEditProfileDialog(user.displayName, user.bio),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              user.displayName,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 55),
-
-                // Saving Indicator
-                if (_isSaving)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                    ),
-                  ),
-
-                // Display Name (tap to edit)
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => _showEditNameDialog(user.displayName, user.bio),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          user.displayName,
-                          style: AppTextStyles.heading2,
+                            const SizedBox(width: 4),
+                            const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 24),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.edit_rounded, color: AppColors.primary, size: 18),
-                      ],
-                    ),
+                      ),
+                      if (_isSaving)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                AppSizes.vSpace4,
 
-                // Phone Number (tap to copy)
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: user.phoneNumber));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Nomor disalin ke clipboard 📋'), duration: Duration(seconds: 2)),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    child: Text(
-                      PhoneNumberFormatter.toDisplay(user.phoneNumber),
-                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ),
-                ),
-                AppSizes.vSpace24,
+                const SizedBox(height: 8),
 
-                // 1. About / Bio Tile (tap to edit)
-                const Divider(color: AppColors.divider, height: 1),
-                ListTile(
-                  leading: const Icon(Icons.info_outline_rounded, color: AppColors.iconColor),
-                  title: const Text('About', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                  subtitle: Text(user.bio, style: AppTextStyles.bodyMedium),
-                  trailing: const Icon(Icons.edit_rounded, color: AppColors.textSecondary, size: 18),
-                  onTap: () => _showEditBioDialog(user.displayName, user.bio),
+                // 1. Langganan (with green dot)
+                _buildSettingsTile(
+                  icon: Icons.diamond_outlined,
+                  title: 'Langganan',
+                  subtitle: 'Jelajahi keuntungan premium',
+                  hasGreenDot: true,
+                  onTap: () => _showFeatureInfo('Langganan Premium', 'Nikmati fitur panggilan tanpa batas, stiker eksklusif, dan sinkronisasi cloud.'),
                 ),
 
-                // 2. Phone Tile
-                const Divider(color: AppColors.divider, height: 1),
-                ListTile(
-                  leading: const Icon(Icons.phone_rounded, color: AppColors.iconColor),
-                  title: const Text('Phone', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                  subtitle: Text(PhoneNumberFormatter.toDisplay(user.phoneNumber), style: AppTextStyles.bodyMedium),
-                  trailing: const Icon(Icons.copy_rounded, color: AppColors.textSecondary, size: 16),
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: user.phoneNumber));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Nomor disalin ke clipboard 📋'), duration: Duration(seconds: 2)),
-                    );
-                  },
+                // 2. Perangkat tertaut
+                _buildSettingsTile(
+                  icon: Icons.devices_rounded,
+                  title: 'Perangkat tertaut',
+                  subtitle: 'Gunakan WhatsApp di perangkat lain',
+                  onTap: () => context.push('/qr-scanner'),
                 ),
 
-                // 3. Appearance & Theme Tile
-                const Divider(color: AppColors.divider, height: 1),
-                ListTile(
-                  leading: const Icon(Icons.palette_outlined, color: AppColors.iconColor),
-                  title: const Text('Appearance & Theme', style: TextStyle(color: AppColors.textPrimary)),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+                // 3. Akun
+                _buildSettingsTile(
+                  icon: Icons.key_rounded,
+                  title: 'Akun',
+                  subtitle: 'Notifikasi keamanan, ganti nomor',
+                  onTap: () => _showAccountDialog(user),
+                ),
+
+                // 4. Privasi
+                _buildSettingsTile(
+                  icon: Icons.lock_outline_rounded,
+                  title: 'Privasi',
+                  subtitle: 'Akun diblokir, pesan sementara',
+                  onTap: () => _showFeatureInfo('Privasi', 'Pengaturan privasi foto profil, status online, dan pesan sementara.'),
+                ),
+
+                // 5. Daftar
+                _buildSettingsTile(
+                  icon: Icons.contacts_outlined,
+                  title: 'Daftar',
+                  subtitle: 'Kelola orang dan grup',
+                  onTap: () => context.push('/contacts'),
+                ),
+
+                // 6. Chat
+                _buildSettingsTile(
+                  icon: Icons.chat_outlined,
+                  title: 'Chat',
+                  subtitle: 'Riwayat obrolan, cadangan',
                   onTap: () => context.push('/appearance-settings'),
                 ),
 
-                // 4. LightChatWeb / Linked Devices Tile
-                const Divider(color: AppColors.divider, height: 1),
-                ListTile(
-                  leading: const Icon(Icons.qr_code_scanner_rounded, color: AppColors.iconColor),
-                  title: const Text('LightChatWeb / Linked Devices', style: TextStyle(color: AppColors.textPrimary)),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-                  onTap: () => context.push('/qr-scanner'),
+                // 7. Tampilan
+                _buildSettingsTile(
+                  icon: Icons.palette_outlined,
+                  title: 'Tampilan',
+                  subtitle: 'Tema obrolan, ikon aplikasi, tema aplikasi',
+                  onTap: () => context.push('/appearance-settings'),
                 ),
-                const Divider(color: AppColors.divider, height: 1),
 
-                AppSizes.vSpace24,
-
-                // Logout Button (Classic Red Outline)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.p24),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: _confirmLogout,
-                      icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-                      label: const Text('LOG OUT', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.error),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      ),
-                    ),
-                  ),
+                // 8. Siaran
+                _buildSettingsTile(
+                  icon: Icons.campaign_outlined,
+                  title: 'Siaran',
+                  subtitle: 'Kelola daftar dan kirim siaran',
+                  onTap: () => _showFeatureInfo('Daftar Siaran', 'Kirim satu pesan ke banyak kontak sekaligus secara privat.'),
                 ),
-                AppSizes.vSpace32,
+
+                // 9. Notifikasi
+                _buildSettingsTile(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Notifikasi',
+                  subtitle: 'Pesan, grup & nada dering panggilan',
+                  onTap: () => _showFeatureInfo('Notifikasi', 'Pengaturan nada dering, getar, dan pratinjau pesan.'),
+                ),
+
+                // 10. Penyimpanan dan data
+                _buildSettingsTile(
+                  icon: Icons.data_usage_rounded,
+                  title: 'Penyimpanan dan data',
+                  subtitle: 'Penggunaan jaringan, unduh otomatis',
+                  onTap: () => _showFeatureInfo('Penyimpanan & Data', 'Kelola memori aplikasi dan pengaturan unduh otomatis media.'),
+                ),
+
+                // 11. Kontrol orang tua
+                _buildSettingsTile(
+                  icon: Icons.shield_outlined,
+                  title: 'Kontrol orang tua',
+                  subtitle: 'Pengaturan untuk keluarga Anda',
+                  onTap: () => _showFeatureInfo('Kontrol Orang Tua', 'Panduan dan fitur keamanan keluarga pada LightChat.'),
+                ),
+
+                // 12. Aksesibilitas
+                _buildSettingsTile(
+                  icon: Icons.accessibility_new_rounded,
+                  title: 'Aksesibilitas',
+                  subtitle: 'Tingkatkan kontras, animasi',
+                  onTap: () => _showFeatureInfo('Aksesibilitas', 'Pengaturan teks tebal, kontras tinggi, dan pengurangan animasi.'),
+                ),
+
+                // 13. Bahasa Aplikasi
+                _buildSettingsTile(
+                  icon: Icons.language_rounded,
+                  title: 'Bahasa Aplikasi',
+                  subtitle: 'Bahasa Indonesia (bahasa perangkat)',
+                  onTap: () => _showFeatureInfo('Bahasa Aplikasi', 'Bahasa aktif saat ini: Bahasa Indonesia.'),
+                ),
+
+                // 14. Bantuan dan masukan
+                _buildSettingsTile(
+                  icon: Icons.help_outline_rounded,
+                  title: 'Bantuan dan masukan',
+                  subtitle: 'Pusat Bantuan, hubungi kami, Kebijakan Privasi',
+                  onTap: () => _showFeatureInfo('Bantuan & Masukan', 'Pusat bantuan LightChat, kontak pengembang, dan syarat privasi.'),
+                ),
+
+                // 15. Undang teman
+                _buildSettingsTile(
+                  icon: Icons.group_outlined,
+                  title: 'Undang teman',
+                  subtitle: null,
+                  onTap: () {
+                    Clipboard.setData(const ClipboardData(text: 'Ayo download dan gunakan LightChat untuk chatting dan call gratis!'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Tautan undangan disalin ke clipboard! 📋')),
+                    );
+                  },
+                ),
+
+                // 16. Pembaruan aplikasi
+                _buildSettingsTile(
+                  icon: Icons.mobile_friendly_rounded,
+                  title: 'Pembaruan aplikasi',
+                  subtitle: null,
+                  onTap: _checkAppUpdate,
+                ),
+
+                // 17. Pusat Akun
+                _buildSettingsTile(
+                  icon: Icons.all_inclusive_rounded,
+                  title: 'Pusat Akun',
+                  subtitle: 'Kendalikan pengalaman Anda di WhatsApp, Facebook, Instagram, dan lainnya.',
+                  onTap: () => _showFeatureInfo('Pusat Akun', 'Kelola akun Anda di seluruh layanan ekosistem LightChat.'),
+                ),
+
+                const SizedBox(height: 24),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSettingsTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    bool hasGreenDot = false,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: Colors.white70, size: 24),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (hasGreenDot)
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(top: 6),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF25D366),
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAccountDialog(UserEntity user) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1F2C34),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Pengaturan Akun', style: AppTextStyles.heading3.copyWith(fontSize: 18)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.phone_rounded, color: AppColors.primary),
+                title: const Text('Nomor Telepon', style: TextStyle(color: Colors.white)),
+                subtitle: Text(user.phoneNumber, style: const TextStyle(color: Colors.white54)),
+              ),
+              const ListTile(
+                leading: Icon(Icons.security_rounded, color: AppColors.primary),
+                title: Text('Notifikasi Keamanan', style: TextStyle(color: Colors.white)),
+                subtitle: Text('Pesan dan panggilan Anda dienkripsi end-to-end', style: TextStyle(color: Colors.white54)),
+              ),
+              const Divider(color: AppColors.divider),
+              ListTile(
+                leading: const Icon(Icons.logout_rounded, color: AppColors.error),
+                title: const Text('Keluar dari Akun', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmLogout();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
