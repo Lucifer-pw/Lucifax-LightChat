@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -64,12 +65,35 @@ class _MediaMessageViewState extends State<MediaMessageView> {
     if (fileName.isNotEmpty) {
       final service = getIt<MediaStorageService>();
       final found = await service.findLocalFile(fileName, widget.message.type);
-      if (mounted) {
+      if (mounted && found != null) {
         setState(() {
           _localFilePath = found;
         });
         return;
       }
+    }
+
+    // Auto-save Base64 image directly to internal-media if received
+    if (widget.message.content.startsWith('data:image') ||
+        (widget.message.content.length > 200 && !widget.message.content.startsWith('http'))) {
+      try {
+        final service = getIt<MediaStorageService>();
+        final dir = await service.getMediaDir(widget.message.type);
+        final safeName = fileName.isNotEmpty ? fileName : 'IMG_${widget.message.messageId}.jpg';
+        final targetFile = File('${dir.path}/$safeName');
+        if (!await targetFile.exists()) {
+          var b64 = widget.message.content;
+          if (b64.contains(',')) b64 = b64.split(',').last;
+          final bytes = base64Decode(b64);
+          await targetFile.writeAsBytes(bytes);
+        }
+        if (mounted) {
+          setState(() {
+            _localFilePath = targetFile.path;
+          });
+          return;
+        }
+      } catch (_) {}
     }
   }
 
@@ -151,6 +175,30 @@ class _MediaMessageViewState extends State<MediaMessageView> {
     } else if (isPurged) {
       // 2. File was purged from server and not cached locally
       imageContent = _buildPurgedPlaceholder();
+    } else if (widget.message.content.startsWith('data:image') ||
+        (widget.message.content.length > 200 && !widget.message.content.startsWith('http'))) {
+      // Direct Base64 render
+      try {
+        var b64 = widget.message.content;
+        if (b64.contains(',')) b64 = b64.split(',').last;
+        final bytes = base64Decode(b64);
+        final memImage = MemoryImage(bytes);
+        imageContent = GestureDetector(
+          onTap: () => _openFullScreenImage(memImage),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              bytes,
+              fit: BoxFit.cover,
+              width: 240,
+              height: 180,
+              errorBuilder: (_, __, ___) => _buildFallbackBox(isPurged),
+            ),
+          ),
+        );
+      } catch (_) {
+        imageContent = _buildFallbackBox(isPurged);
+      }
     } else if (widget.message.content.isNotEmpty) {
       // 3. File in transit on server
       imageContent = ClipRRect(

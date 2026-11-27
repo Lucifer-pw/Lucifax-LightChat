@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -363,13 +364,22 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     required String filePath,
     required String fileName,
   }) async {
+    final file = File(filePath);
+    final fileSize = await file.length();
+    final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'dat';
+    final isImage = ['jpg', 'jpeg', 'png', 'webp'].contains(ext);
+
+    // 1. Try Firebase Storage first
     try {
-      final file = File(filePath);
-      final fileSize = await file.length();
-      final ext = fileName.contains('.') ? fileName.split('.').last : 'dat';
       final storageFileName = '${const Uuid().v4()}.$ext';
       final storagePath = 'transit_media/$chatId/$storageFileName';
-      final ref = _storage.ref().child(storagePath);
+      
+      Reference ref;
+      try {
+        ref = _storage.ref().child(storagePath);
+      } catch (_) {
+        ref = FirebaseStorage.instance.ref().child(storagePath);
+      }
 
       final uploadTask = await ref.putFile(
         file,
@@ -389,8 +399,22 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
         'fileSize': fileSize,
         'fileName': fileName,
       };
-    } catch (e) {
-      throw ServerException('Failed to upload media: $e');
+    } catch (storageError) {
+      // 2. Fallback for images if Firebase Storage bucket is uninitialized or unauthorized
+      if (isImage && fileSize < 650 * 1024) {
+        try {
+          final bytes = await file.readAsBytes();
+          final b64 = base64Encode(bytes);
+          return {
+            'downloadUrl': 'data:image/$ext;base64,$b64',
+            'storagePath': '',
+            'fileSize': fileSize,
+            'fileName': fileName,
+            'isBase64Fallback': true,
+          };
+        } catch (_) {}
+      }
+      throw ServerException('Gagal upload: $storageError');
     }
   }
 

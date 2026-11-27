@@ -109,7 +109,10 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
     }
   }
 
+  List<MessageEntity> _currentMessages = [];
+
   void _onMessagesUpdated(MessagesUpdatedEvent event, Emitter<ChatRoomState> emit) {
+    _currentMessages = event.messages;
     emit(ChatRoomLoaded(event.messages));
   }
 
@@ -149,7 +152,10 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
 
     await uploadResult.fold(
       (failure) async {
-        // Handle upload failure
+        emit(ChatRoomLoaded(
+          _currentMessages,
+          errorMessage: 'Gagal mengunggah media: ${failure.message}. Periksa koneksi atau izin Firebase Storage.',
+        ));
       },
       (uploadData) async {
         final downloadUrl = uploadData['downloadUrl'] as String? ?? '';

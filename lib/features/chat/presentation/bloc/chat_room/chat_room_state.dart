@@ -14,10 +14,12 @@ class ChatRoomLoading extends ChatRoomState {}
 
 class ChatRoomLoaded extends ChatRoomState {
   final List<MessageEntity> messages;
-  const ChatRoomLoaded(this.messages);
+  final String? errorMessage;
+
+  const ChatRoomLoaded(this.messages, {this.errorMessage});
 
   @override
-  List<Object?> get props => [messages];
+  List<Object?> get props => [messages, errorMessage];
 }
 
 class ChatRoomError extends ChatRoomState {

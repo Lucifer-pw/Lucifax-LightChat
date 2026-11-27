@@ -46,6 +46,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   String? _liveOtherUserPhoto;
   String _liveOtherUserPhone = '';
   String _liveOtherUserBio = '';
+  bool _isSendingMedia = false;
 
   @override
   void initState() {
@@ -112,6 +113,10 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   }
 
   void _handleSendMedia(String filePath, String fileName, String type) {
+    setState(() {
+      _isSendingMedia = true;
+      _replyingMessage = null;
+    });
     _chatRoomBloc.add(
       SendMediaMessageEvent(
         chatId: widget.chatId,
@@ -127,7 +132,6 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             : null,
       ),
     );
-    setState(() => _replyingMessage = null);
   }
 
   void _handleDelete(String messageId, String currentUserId, bool forEveryone) {
@@ -315,8 +319,22 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             child: Column(
               children: [
                 Expanded(
-                  child: BlocBuilder<ChatRoomBloc, ChatRoomState>(
+                  child: BlocConsumer<ChatRoomBloc, ChatRoomState>(
                     bloc: _chatRoomBloc,
+                    listener: (context, state) {
+                      if (_isSendingMedia) {
+                        setState(() => _isSendingMedia = false);
+                      }
+                      if (state is ChatRoomLoaded && state.errorMessage != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(state.errorMessage!),
+                            backgroundColor: AppColors.error,
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    },
                     builder: (context, state) {
                 if (state is ChatRoomLoading) {
                   return const LoadingIndicator();
@@ -363,6 +381,18 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
               },
             ),
           ),
+          if (_isSendingMedia)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: AppColors.surface,
+              child: const Row(
+                children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 12),
+                  Text('Mengirim media...', style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
           MessageInput(
             replyingMessage: _replyingMessage,
             onCancelReply: () => setState(() => _replyingMessage = null),
