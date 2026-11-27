@@ -75,7 +75,7 @@ class ChatRoomBloc extends Bloc<ChatRoomEvent, ChatRoomState> {
             final fileName = msg.mediaInfo!['fileName'] as String? ?? '';
 
             if (!isPurged && storagePath.isNotEmpty && fileName.isNotEmpty) {
-              if (!_activeDownloadingMessageIds.contains(msg.messageId)) {
+              if (_activeDownloadingMessageIds.add(msg.messageId)) {
                 _checkAndAutoDownload(event.chatId, msg, storagePath, fileName);
               }
             }

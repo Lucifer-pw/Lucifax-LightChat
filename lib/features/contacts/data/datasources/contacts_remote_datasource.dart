@@ -35,6 +35,10 @@ class ContactsRemoteDataSourceImpl implements ContactsRemoteDataSource {
           final normalized = PhoneNumberFormatter.toE164(phone.number);
           if (PhoneNumberFormatter.isValid(normalized)) {
             normalizedMap[normalized] = contact.displayName;
+            if (normalized.startsWith('+62')) {
+              // Also map legacy format with leading zero
+              normalizedMap['+620${normalized.substring(3)}'] = contact.displayName;
+            }
           }
         }
       }
@@ -84,11 +88,21 @@ class ContactsRemoteDataSourceImpl implements ContactsRemoteDataSource {
   Future<ContactEntity?> findUserByPhoneNumber(String phoneNumber) async {
     try {
       final normalized = PhoneNumberFormatter.toE164(phoneNumber);
-      final query = await _firestore
+      var query = await _firestore
           .collection(FirebaseConstants.usersCollection)
           .where('phoneNumber', isEqualTo: normalized)
           .limit(1)
           .get();
+
+      if (query.docs.isEmpty && normalized.startsWith('+62')) {
+        // Fallback to match legacy +620... format
+        final legacyPhone = '+620${normalized.substring(3)}';
+        query = await _firestore
+            .collection(FirebaseConstants.usersCollection)
+            .where('phoneNumber', isEqualTo: legacyPhone)
+            .limit(1)
+            .get();
+      }
 
       if (query.docs.isEmpty) return null;
 

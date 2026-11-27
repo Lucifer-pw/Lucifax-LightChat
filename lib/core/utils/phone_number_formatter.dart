@@ -8,7 +8,12 @@
     String cleaned = rawNumber.replaceAll(RegExp(r'[\s\-\(\)\.]'), '');
 
     if (cleaned.startsWith('+')) {
+      if (cleaned.startsWith('+620')) {
+        return '+62${cleaned.substring(4)}';
+      }
       return cleaned;
+    } else if (cleaned.startsWith('620')) {
+      return '+62${cleaned.substring(3)}';
     } else if (cleaned.startsWith('62')) {
       return '+$cleaned';
     } else if (cleaned.startsWith('0')) {

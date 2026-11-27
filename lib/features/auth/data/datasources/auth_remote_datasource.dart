@@ -69,13 +69,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         phoneNumber: phoneNumber,
         verificationCompleted: (PhoneAuthCredential credential) async {
           // Auto-resolution on Android
-          await _firebaseAuth.signInWithCredential(credential);
+          try {
+            await _firebaseAuth.signInWithCredential(credential);
+          } catch (_) {}
+          if (!completer.isCompleted) {
+            completer.complete(credential.verificationId ?? 'AUTO_VERIFIED');
+          }
         },
         verificationFailed: (FirebaseAuthException e) {
           if (!completer.isCompleted) {
-            completer.completeError(
-              AuthException(e.message ?? 'Verification failed', e.code),
-            );
+            String errorMsg = e.message ?? 'Verifikasi gagal (${e.code})';
+            if (e.code == 'too-many-requests' || e.code == 'quota-exceeded') {
+              errorMsg = 'Batas SMS Firebase harian tercapai. Silakan gunakan nomor testing Firebase atau coba lagi nanti.';
+            } else if (e.code == 'invalid-phone-number') {
+              errorMsg = 'Format nomor HP tidak valid. Pastikan nomor sudah benar.';
+            } else if (e.code == 'app-not-authorized') {
+              errorMsg = 'Aplikasi belum diotorisasi di Firebase. Pastikan SHA-256 fingerprint release sudah dimasukkan di Firebase Console.';
+            }
+            completer.completeError(AuthException(errorMsg, e.code));
           }
         },
         codeSent: (String verificationId, int? resendToken) {
@@ -88,10 +99,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             completer.complete(verificationId);
           }
         },
-        timeout: const Duration(seconds: 60),
+        timeout: const Duration(seconds: 45),
       );
 
-      return await completer.future;
+      return await completer.future.timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          if (!completer.isCompleted) {
+            completer.completeError(
+              const AuthException(
+                'Waktu verifikasi habis. Periksa koneksi internet atau gunakan nomor testing Firebase.',
+                'timeout',
+              ),
+            );
+          }
+          return completer.future;
+        },
+      );
     } catch (e) {
       if (e is AuthException) rethrow;
       throw AuthException(e.toString());

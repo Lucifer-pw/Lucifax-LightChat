@@ -29,9 +29,18 @@ class _PhoneInputPageState extends State<PhoneInputPage> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    final rawNumber = '$_countryCode${_phoneController.text.trim()}';
-    final normalized = PhoneNumberFormatter.toE164(rawNumber);
+    var input = _phoneController.text.trim();
+    if (input.startsWith('+')) {
+      input = input.replaceFirst('+', '');
+    }
+    if (input.startsWith('62')) {
+      input = input.substring(2);
+    }
+    if (input.startsWith('0')) {
+      input = input.substring(1);
+    }
 
+    final normalized = PhoneNumberFormatter.toE164('$_countryCode$input');
     context.read<AuthBloc>().add(SendPhoneOtpEvent(normalized));
   }
 
@@ -44,11 +53,18 @@ class _PhoneInputPageState extends State<PhoneInputPage> {
             'verificationId': state.verificationId,
             'phoneNumber': state.phoneNumber,
           });
+        } else if (state is AuthenticatedState) {
+          if (state.user.displayName.isEmpty) {
+            context.go('/profile-setup');
+          } else {
+            context.go('/');
+          }
         } else if (state is AuthErrorState) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
               backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
