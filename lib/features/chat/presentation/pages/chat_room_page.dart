@@ -73,7 +73,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
               .snapshots()
               .listen((snap) {
             if (snap.exists && mounted) {
-              final data = snap.data() as Map<String, dynamic>? ?? {};
+              final data = snap.data() ?? {};
               setState(() {
                 _liveOtherUserOnline = data['isOnline'] ?? false;
                 _liveOtherUserName = data['displayName'];

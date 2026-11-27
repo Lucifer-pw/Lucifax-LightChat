@@ -19,7 +19,7 @@ class PhoneInputPage extends StatefulWidget {
 class _PhoneInputPageState extends State<PhoneInputPage> {
   final _phoneController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  String _countryCode = '+62';
+  final String _countryCode = '+62';
 
   @override
   void dispose() {

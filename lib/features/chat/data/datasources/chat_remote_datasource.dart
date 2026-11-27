@@ -358,6 +358,8 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     }
   }
 
+  static bool _storageDisabled = false;
+
   @override
   Future<Map<String, dynamic>> uploadChatMedia({
     required String chatId,
@@ -367,55 +369,65 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     final file = File(filePath);
     final fileSize = await file.length();
     final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'dat';
-    final isImage = ['jpg', 'jpeg', 'png', 'webp'].contains(ext);
 
-    // 1. Try Firebase Storage first
-    try {
-      final storageFileName = '${const Uuid().v4()}.$ext';
-      final storagePath = 'transit_media/$chatId/$storageFileName';
-      
-      Reference ref;
+    // 1. Try Firebase Storage if not already known to be disabled
+    if (!_storageDisabled) {
       try {
-        ref = _storage.ref().child(storagePath);
-      } catch (_) {
-        ref = FirebaseStorage.instance.ref().child(storagePath);
-      }
-
-      final uploadTask = await ref.putFile(
-        file,
-        SettableMetadata(
-          contentType: _getContentType(ext),
-          customMetadata: {
-            'chatId': chatId,
-            'originalName': fileName,
-            'isTransit': 'true',
-          },
-        ),
-      );
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
-      return {
-        'downloadUrl': downloadUrl,
-        'storagePath': storagePath,
-        'fileSize': fileSize,
-        'fileName': fileName,
-      };
-    } catch (storageError) {
-      // 2. Fallback for images if Firebase Storage bucket is uninitialized or unauthorized
-      if (isImage && fileSize < 650 * 1024) {
+        final storageFileName = '${const Uuid().v4()}.$ext';
+        final storagePath = 'transit_media/$chatId/$storageFileName';
+        
+        Reference ref;
         try {
-          final bytes = await file.readAsBytes();
-          final b64 = base64Encode(bytes);
-          return {
-            'downloadUrl': 'data:image/$ext;base64,$b64',
-            'storagePath': '',
-            'fileSize': fileSize,
-            'fileName': fileName,
-            'isBase64Fallback': true,
-          };
-        } catch (_) {}
+          ref = _storage.ref().child(storagePath);
+        } catch (_) {
+          ref = FirebaseStorage.instance.ref().child(storagePath);
+        }
+
+        final uploadTask = await ref.putFile(
+          file,
+          SettableMetadata(
+            contentType: _getContentType(ext),
+            customMetadata: {
+              'chatId': chatId,
+              'originalName': fileName,
+              'isTransit': 'true',
+            },
+          ),
+        ).timeout(const Duration(seconds: 8));
+
+        final downloadUrl = await uploadTask.ref.getDownloadURL();
+        return {
+          'downloadUrl': downloadUrl,
+          'storagePath': storagePath,
+          'fileSize': fileSize,
+          'fileName': fileName,
+        };
+      } catch (storageError) {
+        // Firebase Storage disabled on Spark plan or unauthorized
+        _storageDisabled = true;
       }
-      throw ServerException('Gagal upload: $storageError');
     }
+
+    // 2. Direct Firestore Base64 Relay (Free Spark Plan / Zero Storage Cost)
+    if (fileSize < 750 * 1024) {
+      try {
+        final bytes = await file.readAsBytes();
+        final b64 = base64Encode(bytes);
+        return {
+          'downloadUrl': 'data:${_getContentType(ext)};base64,$b64',
+          'storagePath': '',
+          'fileSize': fileSize,
+          'fileName': fileName,
+          'isBase64Fallback': true,
+        };
+      } catch (e) {
+        throw ServerException('Gagal memproses file: $e');
+      }
+    }
+
+    throw const ServerException(
+      'Ukuran file melebihi 750 KB. Karena project Firebase di paket gratis Spark (tanpa kartu kredit), batas file maksimal adalah 750 KB.',
+    );
   }
 
   String _getContentType(String ext) {

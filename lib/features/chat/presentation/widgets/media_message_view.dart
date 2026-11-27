@@ -73,13 +73,13 @@ class _MediaMessageViewState extends State<MediaMessageView> {
       }
     }
 
-    // Auto-save Base64 image directly to internal-media if received
-    if (widget.message.content.startsWith('data:image') ||
+    // Auto-save Base64 data directly to internal-media if received
+    if (widget.message.content.startsWith('data:') ||
         (widget.message.content.length > 200 && !widget.message.content.startsWith('http'))) {
       try {
         final service = getIt<MediaStorageService>();
         final dir = await service.getMediaDir(widget.message.type);
-        final safeName = fileName.isNotEmpty ? fileName : 'IMG_${widget.message.messageId}.jpg';
+        final safeName = fileName.isNotEmpty ? fileName : '${widget.message.type}_${widget.message.messageId}';
         final targetFile = File('${dir.path}/$safeName');
         if (!await targetFile.exists()) {
           var b64 = widget.message.content;
