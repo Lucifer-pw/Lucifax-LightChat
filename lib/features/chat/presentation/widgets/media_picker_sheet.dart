@@ -37,9 +37,16 @@ class MediaPickerSheet extends StatelessWidget {
     );
   }
 
+  static const int maxFileSizeBytes = 15 * 1024 * 1024; // 15 MB limit
+
   Future<void> _pickFromCamera(BuildContext context) async {
     final picker = ImagePicker();
-    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+    final photo = await picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 75,
+    );
     if (photo != null && context.mounted) {
       Navigator.pop(
         context,
@@ -54,7 +61,12 @@ class MediaPickerSheet extends StatelessWidget {
 
   Future<void> _pickFromGallery(BuildContext context) async {
     final picker = ImagePicker();
-    final photo = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    final photo = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 75,
+    );
     if (photo != null && context.mounted) {
       Navigator.pop(
         context,
@@ -74,6 +86,15 @@ class MediaPickerSheet extends StatelessWidget {
     );
     if (result != null && result.files.isNotEmpty && result.files.first.path != null && context.mounted) {
       final file = result.files.first;
+      if (file.size > maxFileSizeBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ukuran file maksimal 15 MB'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
       Navigator.pop(
         context,
         MediaPickerResult(
@@ -93,6 +114,15 @@ class MediaPickerSheet extends StatelessWidget {
     );
     if (result != null && result.files.isNotEmpty && result.files.first.path != null && context.mounted) {
       final file = result.files.first;
+      if (file.size > maxFileSizeBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ukuran audio maksimal 15 MB'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
       Navigator.pop(
         context,
         MediaPickerResult(

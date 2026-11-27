@@ -65,7 +65,12 @@ class _MessageInputState extends State<MessageInput> {
 
   Future<void> _openCamera() async {
     final picker = ImagePicker();
-    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+    final photo = await picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 75,
+    );
     if (photo != null && widget.onSendMedia != null) {
       widget.onSendMedia!(photo.path, photo.name, 'image');
     }

@@ -29,6 +29,8 @@ import '../../features/chat/domain/usecases/get_messages_stream.dart';
 import '../../features/chat/domain/usecases/mark_as_read.dart';
 import '../../features/chat/domain/usecases/send_message.dart';
 import '../../features/chat/domain/usecases/set_typing_status.dart';
+import '../../core/services/media_storage_service.dart';
+import '../../features/chat/domain/usecases/purge_storage_media.dart';
 import '../../features/chat/domain/usecases/upload_chat_media.dart';
 import '../../features/chat/presentation/bloc/chat_list/chat_list_bloc.dart';
 import '../../features/chat/presentation/bloc/chat_room/chat_room_bloc.dart';
@@ -128,7 +130,9 @@ Future<void> initDependencies() async {
   getIt.registerLazySingleton(() => MarkAsRead(getIt()));
   getIt.registerLazySingleton(() => CreateOrGetPrivateChat(getIt()));
   getIt.registerLazySingleton(() => CreateGroupChat(getIt()));
+  getIt.registerLazySingleton<MediaStorageService>(() => MediaStorageService());
   getIt.registerLazySingleton(() => UploadChatMedia(getIt()));
+  getIt.registerLazySingleton(() => PurgeStorageMedia(getIt()));
   getIt.registerLazySingleton(() => DeleteMessage(getIt()));
   getIt.registerLazySingleton(() => SetTypingStatus(getIt()));
 
@@ -141,6 +145,8 @@ Future<void> initDependencies() async {
       setTypingStatus: getIt(),
       uploadChatMedia: getIt(),
       deleteMessage: getIt(),
+      purgeStorageMedia: getIt(),
+      mediaStorageService: getIt(),
     ),
   );
 

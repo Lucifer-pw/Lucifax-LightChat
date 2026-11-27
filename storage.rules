@@ -7,10 +7,18 @@ service firebase.storage {
       allow write: if request.auth != null && request.resource.size < 5 * 1024 * 1024;
     }
 
-    // Chat media
+    // Ephemeral Transit Media (Auto-purged upon recipient download)
+    match /transit_media/{chatId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.resource.size < 15 * 1024 * 1024;
+      allow delete: if request.auth != null;
+    }
+
+    // Chat media legacy fallback
     match /chat_media/{chatId}/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.resource.size < 100 * 1024 * 1024;
+      allow write: if request.auth != null && request.resource.size < 15 * 1024 * 1024;
+      allow delete: if request.auth != null;
     }
 
     // Status media

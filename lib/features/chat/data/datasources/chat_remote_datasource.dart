@@ -35,10 +35,15 @@ abstract class ChatRemoteDataSource {
     String? photoUrl,
     String? description,
   });
-  Future<String> uploadChatMedia({
+  Future<Map<String, dynamic>> uploadChatMedia({
     required String chatId,
     required String filePath,
     required String fileName,
+  });
+  Future<void> purgeStorageMedia({
+    required String chatId,
+    required String messageId,
+    required String storagePath,
   });
   Future<void> deleteMessage({
     required String chatId,
@@ -353,22 +358,90 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   }
 
   @override
-  Future<String> uploadChatMedia({
+  Future<Map<String, dynamic>> uploadChatMedia({
     required String chatId,
     required String filePath,
     required String fileName,
   }) async {
     try {
+      final file = File(filePath);
+      final fileSize = await file.length();
       final ext = fileName.contains('.') ? fileName.split('.').last : 'dat';
       final storageFileName = '${const Uuid().v4()}.$ext';
-      final ref = _storage.ref().child('chats/$chatId/$storageFileName');
+      final storagePath = 'transit_media/$chatId/$storageFileName';
+      final ref = _storage.ref().child(storagePath);
 
-      final uploadTask = await ref.putFile(File(filePath));
+      final uploadTask = await ref.putFile(
+        file,
+        SettableMetadata(
+          contentType: _getContentType(ext),
+          customMetadata: {
+            'chatId': chatId,
+            'originalName': fileName,
+            'isTransit': 'true',
+          },
+        ),
+      );
       final downloadUrl = await uploadTask.ref.getDownloadURL();
-      return downloadUrl;
+      return {
+        'downloadUrl': downloadUrl,
+        'storagePath': storagePath,
+        'fileSize': fileSize,
+        'fileName': fileName,
+      };
     } catch (e) {
       throw ServerException('Failed to upload media: $e');
     }
+  }
+
+  String _getContentType(String ext) {
+    switch (ext.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'm4a':
+      case 'aac':
+        return 'audio/mp4';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  @override
+  Future<void> purgeStorageMedia({
+    required String chatId,
+    required String messageId,
+    required String storagePath,
+  }) async {
+    try {
+      if (storagePath.isNotEmpty) {
+        final ref = _storage.ref().child(storagePath);
+        await ref.delete();
+      }
+    } catch (_) {
+      // Ignore if already deleted or doesn't exist
+    }
+
+    try {
+      await _firestore
+          .collection(FirebaseConstants.chatsCollection)
+          .doc(chatId)
+          .collection(FirebaseConstants.messagesSubcollection)
+          .doc(messageId)
+          .update({
+        'mediaInfo.isPurgedFromStorage': true,
+      });
+    } catch (_) {}
   }
 
   @override

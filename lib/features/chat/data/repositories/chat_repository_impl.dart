@@ -111,18 +111,38 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<Either<Failure, String>> uploadChatMedia({
+  Future<Either<Failure, Map<String, dynamic>>> uploadChatMedia({
     required String chatId,
     required String filePath,
     required String fileName,
   }) async {
     try {
-      final url = await remoteDataSource.uploadChatMedia(
+      final result = await remoteDataSource.uploadChatMedia(
         chatId: chatId,
         filePath: filePath,
         fileName: fileName,
       );
-      return Right(url);
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message, e.code));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> purgeStorageMedia({
+    required String chatId,
+    required String messageId,
+    required String storagePath,
+  }) async {
+    try {
+      await remoteDataSource.purgeStorageMedia(
+        chatId: chatId,
+        messageId: messageId,
+        storagePath: storagePath,
+      );
+      return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message, e.code));
     } catch (e) {

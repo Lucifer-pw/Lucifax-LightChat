@@ -30,10 +30,15 @@ abstract class ChatRepository {
     String? photoUrl,
     String? description,
   });
-  Future<Either<Failure, String>> uploadChatMedia({
+  Future<Either<Failure, Map<String, dynamic>>> uploadChatMedia({
     required String chatId,
     required String filePath,
     required String fileName,
+  });
+  Future<Either<Failure, void>> purgeStorageMedia({
+    required String chatId,
+    required String messageId,
+    required String storagePath,
   });
   Future<Either<Failure, void>> deleteMessage({
     required String chatId,

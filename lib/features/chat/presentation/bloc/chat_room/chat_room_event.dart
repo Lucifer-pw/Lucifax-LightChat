@@ -99,3 +99,24 @@ class DeleteMessageEvent extends ChatRoomEvent {
   @override
   List<Object?> get props => [chatId, messageId, currentUserId, forEveryone];
 }
+
+class DownloadAndPurgeMediaEvent extends ChatRoomEvent {
+  final String chatId;
+  final String messageId;
+  final String storagePath;
+  final String downloadUrl;
+  final String fileName;
+  final String type;
+
+  const DownloadAndPurgeMediaEvent({
+    required this.chatId,
+    required this.messageId,
+    required this.storagePath,
+    required this.downloadUrl,
+    required this.fileName,
+    required this.type,
+  });
+
+  @override
+  List<Object?> get props => [chatId, messageId, storagePath, downloadUrl, fileName, type];
+}

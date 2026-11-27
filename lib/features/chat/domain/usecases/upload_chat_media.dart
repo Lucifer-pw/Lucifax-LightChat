@@ -7,7 +7,7 @@ class UploadChatMedia {
 
   UploadChatMedia(this.repository);
 
-  Future<Either<Failure, String>> call({
+  Future<Either<Failure, Map<String, dynamic>>> call({
     required String chatId,
     required String filePath,
     required String fileName,

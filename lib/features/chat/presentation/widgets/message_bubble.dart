@@ -1,14 +1,13 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/theme/appearance_cubit.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../domain/entities/message_entity.dart';
+import 'media_message_view.dart';
 import 'message_status_icon.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -212,125 +211,11 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context, bool isMe) {
-    if (message.type == 'image') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: CachedNetworkImage(
-              imageUrl: message.content,
-              fit: BoxFit.cover,
-              width: 240,
-              height: 180,
-              placeholder: (context, url) => Container(
-                width: 240,
-                height: 180,
-                color: AppColors.surfaceLight,
-                child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              ),
-              errorWidget: (context, url, error) => Container(
-                width: 240,
-                height: 180,
-                color: AppColors.surfaceLight,
-                child: const Icon(Icons.broken_image_rounded, color: AppColors.textMuted),
-              ),
-            ),
-          ),
-          if (message.mediaInfo?['caption'] != null && message.mediaInfo!['caption'].isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                message.mediaInfo!['caption'],
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: isMe ? AppColors.bubbleSentText : AppColors.bubbleReceivedText,
-                ),
-              ),
-            ),
-        ],
-      );
-    } else if (message.type == 'file') {
-      final fileName = message.mediaInfo?['fileName'] ?? 'Document';
-      final fileSize = message.mediaInfo?['fileSize'];
-      final formattedSize = fileSize != null ? '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB' : '';
-
-      return InkWell(
-        onTap: () {
-          if (message.content.isNotEmpty) {
-            launchUrl(Uri.parse(message.content), mode: LaunchMode.externalApplication);
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.insert_drive_file_rounded, color: AppColors.primary, size: 32),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fileName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    if (formattedSize.isNotEmpty)
-                      Text(
-                        formattedSize,
-                        style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-                      ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.download_rounded, color: AppColors.primary, size: 20),
-            ],
-          ),
-        ),
-      );
-    } else if (message.type == 'audio' || message.type == 'voice') {
-      final fileName = message.mediaInfo?['fileName'] ?? 'Audio message';
-      return Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.primary, size: 36),
-              onPressed: () {
-                if (message.content.isNotEmpty) {
-                  launchUrl(Uri.parse(message.content), mode: LaunchMode.externalApplication);
-                }
-              },
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  const Text('Audio file', style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
+    if (message.type == 'image' ||
+        message.type == 'file' ||
+        message.type == 'audio' ||
+        message.type == 'voice') {
+      return MediaMessageView(message: message, isMe: isMe);
     }
 
     // Default text message
